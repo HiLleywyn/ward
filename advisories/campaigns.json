@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-01T00:00:00Z",
+  "campaigns": [
+    {
+      "id": "2026-10-fake-ps5-emulators",
+      "status": "reported-no-public-iocs",
+      "first_public_report": "2026-10-28",
+      "impersonated_projects": ["AnyPS5", "KytyPS5"],
+      "reported_behavior": [
+        "Windows malware delivered through lookalike GitHub repositories",
+        "environment and sandbox checks",
+        "Microsoft Defender exclusions",
+        "suspected information-stealing payload",
+        "cleanup script that removes campaign files"
+      ],
+      "confirmed_repository_urls": [],
+      "confirmed_sha256": [],
+      "evidence": [
+        {
+          "url": "https://www.techspot.com/news/114376-gamers-hunting-ps5-emulators-actually-downloading-malware-instead.html",
+          "type": "secondary-report",
+          "attribution": "NordVPN Threat Intelligence"
+        },
+        {
+          "url": "https://www.tomshardware.com/tech-industry/cyber-security/fake-ps5-emulators-are-being-used-to-infect-gamers-computers-with-password-scraping-malware-two-well-known-github-repos-including-anyps5-hit",
+          "type": "secondary-report-with-vendor-briefing",
+          "attribution": "NordVPN Threat Intelligence"
+        }
+      ],
+      "validation_notes": "The campaign is credibly reported, but public coverage does not identify exact repository URLs or file hashes. This record must not be used to accuse a specific repository."
+    }
+  ]
+}
+

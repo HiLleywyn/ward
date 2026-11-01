@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-01T00:00:00Z",
+  "projects": [
+    {
+      "name": "AnyPS5",
+      "repository": "https://github.com/boykopovar/AnyPS5",
+      "homepage": "https://boykopovar.github.io/AnyPS5/",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    },
+    {
+      "name": "KytyPS5",
+      "repository": "https://github.com/KytyPS5/KytyPS5",
+      "homepage": "https://github.com/KytyPS5/KytyPS5",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    },
+    {
+      "name": "shadPS4",
+      "repository": "https://github.com/shadps4-emu/shadPS4",
+      "homepage": "https://shadps4.net/",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    },
+    {
+      "name": "RPCS3",
+      "repository": "https://github.com/RPCS3/rpcs3",
+      "homepage": "https://rpcs3.net/",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    },
+    {
+      "name": "PCSX2",
+      "repository": "https://github.com/PCSX2/pcsx2",
+      "homepage": "https://pcsx2.net/",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    },
+    {
+      "name": "Dolphin",
+      "repository": "https://github.com/dolphin-emu/dolphin",
+      "homepage": "https://dolphin-emu.org/",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    },
+    {
+      "name": "PPSSPP",
+      "repository": "https://github.com/hrydgard/ppsspp",
+      "homepage": "https://www.ppsspp.org/",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    },
+    {
+      "name": "Xenia",
+      "repository": "https://github.com/xenia-project/xenia",
+      "homepage": "https://xenia.jp/",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    },
+    {
+      "name": "Cemu",
+      "repository": "https://github.com/cemu-project/Cemu",
+      "homepage": "https://cemu.info/",
+      "note": "Identity anchor only. Inclusion is not a blanket safety guarantee."
+    }
+  ]
+}
+

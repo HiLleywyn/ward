@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-01T00:00:00Z",
+  "assets": [
+    {
+      "project": "AnyPS5",
+      "repository": "boykopovar/AnyPS5",
+      "release": "v0.1.2",
+      "name": "relinker-v0.1.2.exe",
+      "sha256": "88cc311d19b1a4e41f0f34883dfb61b118bdfacd317c3960cb62e4c707bd9401",
+      "size": 5093386,
+      "release_url": "https://github.com/boykopovar/AnyPS5/releases/tag/v0.1.2",
+      "provenance_url": "https://github.com/boykopovar/AnyPS5/issues/7405",
+      "note": "GitHub release metadata and a project collaborator identify this as the CI-built v0.1.2 artifact. This is a provenance control, not a blanket safety guarantee."
+    },
+    {
+      "project": "AnyPS5",
+      "repository": "boykopovar/AnyPS5",
+      "release": "v0.1.4",
+      "name": "relinker-v0.1.4.exe",
+      "sha256": "6f6d49e3613ea7fce859621265068bfd64161a729a8051c83150f2d45ec193e0",
+      "size": 5736372,
+      "release_url": "https://github.com/boykopovar/AnyPS5/releases/tag/v0.1.4",
+      "provenance_url": "https://api.github.com/repos/boykopovar/AnyPS5/releases/tags/v0.1.4",
+      "note": "Digest and size are from GitHub release asset metadata. This is a provenance control, not a blanket safety guarantee."
+    }
+  ]
+}

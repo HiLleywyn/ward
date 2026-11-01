@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+from .analyze import assess_file, assess_repository, load_indicators, parse_repository_target
+from .github import GitHubClient, GitHubError
+from .discovery import hunt_project
+from .analyze import CANONICAL_PROJECTS
+from .web import serve
+from .registry import validate_registry
+
+
+def _default_indicator_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "advisories" / "indicators.json"
+
+
+def _print_human(result: dict) -> None:
+    print(f"Target:  {result['target']}")
+    print(f"Verdict: {result['verdict']}")
+    print(f"Score:   {result['score']}/100")
+    if result["signals"]:
+        print("\nSignals:")
+        for signal in result["signals"]:
+            suffix = f" (+{signal['points']})" if signal["points"] else ""
+            print(f"  - {signal['message']}{suffix}")
+    print("\nLimits:")
+    for limitation in result["limitations"]:
+        print(f"  - {limitation}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="emuwatch",
+        description="Check emulator repositories and files without executing or uploading them.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    repo = subparsers.add_parser("repo", help="inspect GitHub metadata and README text")
+    repo.add_argument("target", help="OWNER/REPOSITORY or a github.com repository URL")
+    repo.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+
+    file_parser = subparsers.add_parser("file", help="compare a local file hash to confirmed indicators")
+    file_parser.add_argument("path", type=Path)
+    file_parser.add_argument("--indicators", type=Path, default=_default_indicator_path())
+    file_parser.add_argument(
+        "--known-assets",
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / "advisories" / "known-project-assets.json",
+    )
+    file_parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+
+    web = subparsers.add_parser("web", help="launch the local interactive checker")
+    web.add_argument("--port", type=int, default=8787)
+    web.add_argument("--no-open", action="store_true", help="do not open a browser automatically")
+
+    hunt = subparsers.add_parser("hunt", help="find lookalikes for private human review")
+    hunt.add_argument("project", choices=sorted(CANONICAL_PROJECTS))
+    hunt.add_argument("--limit", type=int, default=20, help="maximum repositories to inspect")
+    hunt.add_argument("--min-score", type=int, default=20, help="minimum metadata score to show")
+    hunt.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+
+    validate = subparsers.add_parser("validate", help="validate advisory registry files")
+    validate.add_argument(
+        "directory",
+        nargs="?",
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / "advisories",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        if args.command == "web":
+            serve(port=args.port, open_browser=not args.no_open)
+            return 0
+        if args.command == "hunt":
+            result = hunt_project(
+                GitHubClient(os.environ.get("GITHUB_TOKEN")),
+                args.project,
+                limit=args.limit,
+                minimum_score=args.min_score,
+                on_progress=None if args.json else lambda name: print(f"Checking {name}...", file=sys.stderr),
+            )
+            value = {
+                "project": result.project,
+                "query": result.query,
+                "assessments": [item.to_dict() for item in result.assessments],
+                "errors": [item.__dict__ for item in result.errors],
+            }
+            if args.json:
+                print(json.dumps(value, indent=2))
+            else:
+                print(f"\n{result.project}: {len(result.assessments)} candidate(s) need review")
+                for item in result.assessments:
+                    print(f"  {item.score:>3}/100  {item.verdict:<20} {item.target}")
+                if result.errors:
+                    print(f"\n{len(result.errors)} repository check(s) failed.", file=sys.stderr)
+                print("\nThese are review candidates, not confirmed malware.")
+            return 0
+        if args.command == "validate":
+            problems = validate_registry(args.directory)
+            if problems:
+                for problem in problems:
+                    print(f"{problem.file}:{problem.location}: {problem.message}", file=sys.stderr)
+                return 1
+            print(f"Registry is valid: {args.directory}")
+            return 0
+        if args.command == "repo":
+            owner, repository = parse_repository_target(args.target)
+            snapshot = GitHubClient(os.environ.get("GITHUB_TOKEN")).snapshot(owner, repository)
+            assessment = assess_repository(snapshot)
+        else:
+            if not args.path.is_file():
+                raise ValueError(f"File does not exist: {args.path}")
+            assessment = assess_file(
+                args.path,
+                load_indicators(args.indicators),
+                load_indicators(args.known_assets),
+            )
+    except (GitHubError, OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    result = assessment.to_dict()
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        _print_human(result)
+    return 1 if assessment.exact_indicator_match else 0
+

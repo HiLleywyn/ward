@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Check emulator downloads without running or uploading them.">
+  <title>Emulator Safety Watch</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <main>
+    <header class="hero">
+      <div class="mascot" aria-hidden="true">🛡️</div>
+      <div>
+        <p class="eyebrow">PLAYER TWO FOR DOWNLOAD SAFETY</p>
+        <h1>Is this emulator download sketchy?</h1>
+        <p class="lede">Paste a GitHub link or drop a file. Nothing gets run. Files never leave your device.</p>
+      </div>
+    </header>
+
+    <section class="checker" aria-labelledby="repo-title">
+      <div class="section-heading">
+        <span class="number">01</span>
+        <div>
+          <h2 id="repo-title">Check a GitHub repo</h2>
+          <p>We inspect public metadata, release names, and the README. We never download the build.</p>
+        </div>
+      </div>
+      <form id="repo-form">
+        <label for="repo-target">GitHub repository</label>
+        <div class="input-row">
+          <input id="repo-target" name="target" type="text" inputmode="url" autocomplete="off" placeholder="https://github.com/owner/project" required>
+          <button type="submit">Scan metadata</button>
+        </div>
+      </form>
+      <div id="repo-loading" class="loading" hidden>Checking the map, not opening the chest...</div>
+      <div id="repo-result" class="result" hidden aria-live="polite"></div>
+    </section>
+
+    <section class="checker" aria-labelledby="file-title">
+      <div class="section-heading">
+        <span class="number">02</span>
+        <div>
+          <h2 id="file-title">Check a file hash</h2>
+          <p>Your browser calculates SHA-256 locally and compares it to confirmed indicators.</p>
+        </div>
+      </div>
+      <label id="drop-zone" class="drop-zone" for="file-input">
+        <span class="drop-icon" aria-hidden="true">⬇</span>
+        <strong>Drop a file here</strong>
+        <span>or tap to choose one</span>
+        <input id="file-input" type="file">
+      </label>
+      <div id="file-result" class="result" hidden aria-live="polite"></div>
+    </section>
+
+    <section class="quick-guide" aria-labelledby="guide-title">
+      <h2 id="guide-title">Three rules before you hit Run</h2>
+      <div class="rule-grid">
+        <article><span>1UP</span><h3>Follow the project</h3><p>Start from the developer's own site or profile. A familiar repo name proves nothing.</p></article>
+        <article><span>ARMOR</span><h3>Never nerf Defender</h3><p>An emulator should not need exclusions, disabled antivirus, or mystery admin commands.</p></article>
+        <article><span>SAVE</span><h3>Keep the receipt</h3><p>Save the repo URL, release URL, and SHA-256. Those details make takedowns possible.</p></article>
+      </div>
+    </section>
+
+    <section class="checker" aria-labelledby="watch-title">
+      <div class="section-heading">
+        <span class="number">03</span>
+        <div>
+          <h2 id="watch-title">Campaign watch</h2>
+          <p>Evidence-backed warnings, with missing details shown instead of guessed.</p>
+        </div>
+      </div>
+      <div id="campaigns" class="campaigns" aria-live="polite">
+        <p class="loading">Loading the watchlist...</p>
+      </div>
+    </section>
+  </main>
+  <footer>Built for players. Evidence first. No file uploads. No automatic accusations.</footer>
+  <script src="/app.js"></script>
+</body>
+</html>
+
