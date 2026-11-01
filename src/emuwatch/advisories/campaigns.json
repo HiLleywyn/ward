@@ -4,6 +4,7 @@
   "campaigns": [
     {
       "id": "2026-10-fake-ps5-emulators",
+      "title": "Fake PS5 emulator campaign",
       "status": "reported-no-public-iocs",
       "first_public_report": "2026-10-28",
       "impersonated_projects": ["AnyPS5", "KytyPS5"],
@@ -32,6 +33,7 @@
     },
     {
       "id": "2024-09-godloader-stargazers",
+      "title": "GodLoader hidden in fake developer projects",
       "status": "reported-with-public-iocs",
       "first_public_report": "2024-11-27",
       "impersonated_projects": ["Game tools", "Developer utilities", "Godot packages"],
@@ -59,6 +61,102 @@
         }
       ],
       "validation_notes": "Check Point published file hashes but not a durable repository-path list. Ward can identify exact matching files without accusing unrelated Godot or GitHub projects."
+    },
+    {
+      "id": "2025-06-minecraft-stargazers",
+      "title": "Fake Minecraft mods from the Stargazers Ghost Network",
+      "status": "reported-with-public-iocs",
+      "first_public_report": "2025-06-18",
+      "impersonated_projects": ["Oringo", "Taunahi", "Minecraft mods"],
+      "reported_behavior": [
+        "malicious Java mods delivered through GitHub release archives",
+        "second-stage Java stealer",
+        "third-stage .NET stealer"
+      ],
+      "confirmed_repository_urls": [],
+      "confirmed_sha256": [
+        "5d80105913e42efe58f4c325ac9b7c89857cc67e1dcab9d99f865a28ef084b37",
+        "97df45c790994bbe7ac1a2cf83d42791c9d832fa21b99c867f5b329e0cc63f64",
+        "4c944b07832d5c29e7b499d9dd17a3d71f0fd918ab68694d110cbb8523b8af49"
+      ],
+      "evidence": [
+        {
+          "url": "https://research.checkpoint.com/2025/minecraft-mod-malware-stargazers/",
+          "type": "primary-research",
+          "attribution": "Check Point Research"
+        }
+      ],
+      "validation_notes": "The report names repositories, filenames, and campaign hashes, but does not map an exact malicious file path and hash to each repository. Ward therefore keeps it in Coverage, not the repository malware database."
+    },
+    {
+      "id": "2025-12-webrat-exploit-lures",
+      "title": "Webrat disguised as exploit repositories",
+      "status": "reported-with-public-iocs",
+      "first_public_report": "2025-12-23",
+      "impersonated_projects": ["CVE exploits", "Proofs of concept"],
+      "reported_behavior": [
+        "password-protected release archives",
+        "administrator privilege escalation and Defender disablement",
+        "Webrat download and execution"
+      ],
+      "confirmed_repository_urls": [],
+      "confirmed_sha256": [],
+      "evidence": [
+        {
+          "url": "https://securelist.com/webrat-distributed-via-github/118555/",
+          "type": "primary-research",
+          "attribution": "Kaspersky Securelist"
+        }
+      ],
+      "validation_notes": "The report names repositories and describes a shared archive structure, but notes that the primary executable filename can vary. Ward does not present those paths as repository-specific malware records."
+    },
+    {
+      "id": "2025-02-gitvenom",
+      "title": "GitVenom fake projects and payload repository",
+      "status": "reported-with-public-iocs",
+      "first_public_report": "2025-02-24",
+      "impersonated_projects": ["Developer tools", "Game cheats", "Crypto bots"],
+      "reported_behavior": [
+        "malicious code hidden in fake multi-language projects",
+        "credential and cryptocurrency theft",
+        "AsyncRAT, Quasar, and clipboard hijacker delivery"
+      ],
+      "confirmed_repository_urls": [],
+      "confirmed_sha256": [],
+      "evidence": [
+        {
+          "url": "https://securelist.com/gitvenom-campaign/115694/",
+          "type": "primary-research",
+          "attribution": "Kaspersky Securelist"
+        }
+      ],
+      "validation_notes": "The report names Dipo17/battle as payload infrastructure but does not publish an exact malicious path for that repository. It remains Coverage rather than a malware database record."
+    },
+    {
+      "id": "2026-10-yoba-ai-lures",
+      "title": "Yoba hidden in fake AI desktop applications",
+      "status": "reported-with-repository-artifacts",
+      "first_public_report": "2026-10-27",
+      "impersonated_projects": ["GPT-5.6 Sol", "GPT-6 Astra", "Claude Opus"],
+      "reported_behavior": [
+        "DLL sideloading through signed OpenAI and Anthropic executables",
+        "scheduled-task persistence and attacker-selected payload delivery",
+        "XMRig cryptocurrency miner observed as a final payload"
+      ],
+      "confirmed_repository_urls": [
+        "https://github.com/gpt-5-6/gpt-5-6.github.io",
+        "https://github.com/gpt-6-astra/gpt-6-astra.github.io",
+        "https://github.com/opus-5-0/opus-5-0.github.io"
+      ],
+      "confirmed_sha256": [],
+      "evidence": [
+        {
+          "url": "https://research.checkpoint.com/2026/tricks-from-the-past-deployed-via-signed-chatgpt-and-claude-binaries/",
+          "type": "primary-research",
+          "attribution": "Check Point Research"
+        }
+      ],
+      "validation_notes": "The report maps three repositories to named release archives and identifies winmm.dll inside those archives as YobaDropper. Those three repository-specific entries are published in Ward's malware database."
     }
   ]
 }

@@ -9,11 +9,12 @@ from collections import deque
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from .analyze import assess_repository, parse_repository_target
 from .github import GitHubClient, GitHubError
 from .data import advisory_directory
-from .evidence import default_store, repository_warning, reviewed_repositories, snapshot_evidence
+from .evidence import default_store, malware_record, malware_records, repository_warning, snapshot_evidence
 
 
 WEB_ROOT = Path(__file__).with_name("webui")
@@ -30,7 +31,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
     check_lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "EmuWatch/0.1"
+        server_version = "Ward/0.3"
         sys_version = ""
 
         def setup(self):
@@ -63,7 +64,8 @@ def _handler() -> type[BaseHTTPRequestHandler]:
             if not self._allowed_host():
                 self._send_json({"error": "Invalid host"}, HTTPStatus.BAD_REQUEST)
                 return
-            if self.path == "/healthz":
+            request = urlsplit(self.path)
+            if request.path == "/healthz":
                 from . import __version__
                 self._send_json({"status": "ok", "version": __version__, "public": public})
                 return
@@ -72,7 +74,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 "/styles.css": (WEB_ROOT / "styles.css", "text/css; charset=utf-8"),
                 "/app.js": (WEB_ROOT / "app.js", "text/javascript; charset=utf-8"),
             }
-            if self.path == "/api/indicators":
+            if request.path == "/api/indicators":
                 indicator_path = advisory_directory() / "indicators.json"
                 known_path = advisory_directory() / "known-project-assets.json"
                 try:
@@ -87,21 +89,33 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 except (OSError, json.JSONDecodeError) as exc:
                     self._send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
                 return
-            if self.path == "/api/campaigns":
+            if request.path == "/api/campaigns":
                 campaign_path = advisory_directory() / "campaigns.json"
                 try:
                     self._send_json(json.loads(campaign_path.read_text(encoding="utf-8")))
                 except (OSError, json.JSONDecodeError) as exc:
                     self._send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
                 return
-            if self.path == "/api/reviewed":
+            if request.path == "/api/reviewed":
                 review_data = json.loads((advisory_directory() / "review-status.json").read_text(encoding="utf-8"))
-                self._send_json({"repositories": reviewed_repositories(), "reviews": review_data["reviews"], "coverage": review_data["coverage"]})
+                self._send_json({"records": malware_records(), "coverage": review_data["coverage"]})
                 return
-            if self.path == "/api/history":
+            if request.path == "/api/record":
+                target = parse_qs(request.query).get("repository", [""])[0]
+                try:
+                    record = malware_record(target)
+                except ValueError as exc:
+                    self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+                    return
+                if record is None:
+                    self._send_json({"error": "record not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json(record)
+                return
+            if request.path == "/api/history":
                 self._send_json({"observations": [] if public else store.history()})
                 return
-            route = routes.get(self.path)
+            route = routes.get(request.path)
             if route is None:
                 self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
                 return
@@ -199,7 +213,7 @@ def serve(port: int = 8787, open_browser: bool = True) -> None:
     address = ("0.0.0.0" if os.environ.get("EMUWATCH_PUBLIC") == "1" else "127.0.0.1", port)
     server = BoundedHTTPServer(address, _handler())
     url = f"http://127.0.0.1:{port}"
-    print(f"Emulator Safety Watch is ready at {url}")
+    print(f"Ward is ready at {url}")
     print("Press Ctrl+C to stop it.")
     if open_browser:
         threading.Timer(0.35, lambda: webbrowser.open(url)).start()

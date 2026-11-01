@@ -26,7 +26,15 @@ class PublicWebTests(unittest.TestCase):
                     with urlopen(request,timeout=3) as response:
                         self.assertEqual(json.load(response)['status'], 'FAIL')
                     self.assertEqual(get('/api/history'), {'observations':[]})
-                    self.assertEqual(len(get('/api/reviewed')['repositories']),25)
+                    reviewed = get('/api/reviewed')
+                    self.assertEqual(len(reviewed['records']), 3)
+                    self.assertNotIn('repositories', reviewed)
+                    record = get('/api/record?repository=gpt-5-6%2Fgpt-5-6.github.io')
+                    self.assertEqual(record['artifact'], 'sol-setup.zip')
+                    self.assertEqual(record['malicious_path'], 'sol-setup.zip / winmm.dll')
+                    with self.assertRaises(HTTPError) as missing:
+                        get('/api/record?repository=anyps-5%2FAnyPS5-Github')
+                    self.assertEqual(missing.exception.code, 404)
                     for data in (b'[]', b'null', b'{"target":"owner/.."}'):
                         with self.subTest(data=data), self.assertRaises(HTTPError):
                             urlopen(Request(base+'/api/check-repo',data=data,headers={'Content-Type':'application/json'}),timeout=3)

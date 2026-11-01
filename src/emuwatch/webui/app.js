@@ -7,16 +7,37 @@ const fileResult = document.querySelector("#file-result");
 const dropZone = document.querySelector("#drop-zone");
 
 const statusInfo = {
-  FAIL: {icon: 'X', label: 'Known malware report or exact malware match', tone: 'danger'},
-  UNKNOWN: {icon: '~', label: 'Unverified or still under investigation', tone: 'caution'},
-  PASS: {icon: '✓', label: 'Specific check verified; not a guarantee of safety', tone: 'good'},
+  FAIL: {icon: 'circle-x', label: 'Confirmed malicious record or exact malware match', tone: 'danger'},
+  UNKNOWN: {icon: 'circle-minus', label: 'Unverified or still under investigation', tone: 'caution'},
+  PASS: {icon: 'circle-check', label: 'Specific check verified; not a guarantee of safety', tone: 'good'},
 };
+
+const iconPaths = {
+  'circle-x': ['<circle cx="12" cy="12" r="10"></circle>', '<path d="m15 9-6 6"></path>', '<path d="m9 9 6 6"></path>'],
+  'circle-minus': ['<circle cx="12" cy="12" r="10"></circle>', '<path d="M8 12h8"></path>'],
+  'circle-check': ['<circle cx="12" cy="12" r="10"></circle>', '<path d="m9 12 2 2 4-4"></path>'],
+  'chevron-down': ['<path d="m6 9 6 6 6-6"></path>'],
+};
+
+function icon(name, className = '') {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.className.baseVal = className;
+  svg.innerHTML = iconPaths[name].join('');
+  return svg;
+}
 
 function statusBadge(status) {
   const info = statusInfo[status] || statusInfo.UNKNOWN;
   const badge = document.createElement('span');
   badge.className = `status-icon ${info.tone}`;
-  badge.textContent = info.icon;
+  badge.append(icon(info.icon, 'status-svg'));
   badge.title = info.label;
   badge.setAttribute('aria-label', info.label);
   return badge;
@@ -182,36 +203,26 @@ async function loadCampaigns() {
     if (!response.ok) throw new Error(payload.error || "Watchlist unavailable.");
     container.replaceChildren();
     for (const campaign of payload.campaigns) {
-      const card = document.createElement("article");
-      card.className = "campaign";
-      const top = document.createElement("div");
-      top.className = "campaign-top";
-      const title = document.createElement("h3");
-      title.textContent = campaign.impersonated_projects.join(" + ");
-      const hasConfirmedFiles = Array.isArray(campaign.confirmed_sha256) && campaign.confirmed_sha256.length > 0;
-      const status = statusBadge(hasConfirmedFiles ? 'FAIL' : 'UNKNOWN');
-      status.title = hasConfirmedFiles
-        ? `${campaign.confirmed_sha256.length} confirmed malicious file hashes published`
-        : 'Campaign reported; exact files are not confirmed';
-      status.setAttribute('aria-label', status.title);
-      top.append(title, status);
-      const note = document.createElement("p");
-      note.textContent = campaign.validation_notes;
-      const list = document.createElement("ul");
-      for (const behavior of campaign.reported_behavior) {
-        const item = document.createElement("li");
-        item.textContent = behavior;
-        list.append(item);
-      }
-      card.append(top, note, list);
-      if (campaign.evidence?.[0]?.url) {
+      for (const evidence of campaign.evidence || []) {
+        const card = document.createElement("article");
+        card.className = "campaign coverage-card";
+        const type = document.createElement('span');
+        type.className = 'coverage-type';
+        type.textContent = evidence.type.startsWith('primary') ? 'Research' : 'News';
+        const title = document.createElement("h3");
+        title.textContent = campaign.title || campaign.impersonated_projects.join(" + ");
+        const byline = document.createElement('p');
+        byline.className = 'coverage-byline';
+        byline.textContent = `${evidence.attribution} · ${formatDate(campaign.first_public_report)}`;
+        const note = document.createElement("p");
+        note.textContent = campaign.validation_notes;
         const source = document.createElement('a');
-        source.href = campaign.evidence[0].url;
+        source.href = evidence.url;
         source.rel = 'noreferrer';
-        source.textContent = 'Read the source report';
-        card.append(source);
+        source.textContent = type.textContent === 'News' ? 'Read the article' : 'Read the research report';
+        card.append(type, title, byline, note, source);
+        container.append(card);
       }
-      container.append(card);
     }
   } catch (error) {
     renderError(container, error.message);
@@ -223,64 +234,97 @@ loadCampaigns();
 async function loadReviewed() {
   const container = document.querySelector('#reviewed');
   try {
-    const [reviewedResponse, historyResponse] = await Promise.all([fetch('/api/reviewed'), fetch('/api/history')]);
-    if (!reviewedResponse.ok || !historyResponse.ok) throw new Error('Result history unavailable');
+    const reviewedResponse = await fetch('/api/reviewed');
+    if (!reviewedResponse.ok) throw new Error('Malware records unavailable');
     const reviewed = await reviewedResponse.json();
-    const history = await historyResponse.json();
     container.replaceChildren();
     const summary = document.createElement('p');
-    summary.textContent = `${reviewed.repositories.length} source-backed repository warnings. ${history.observations.length} recent local observations.`;
+    summary.className = 'record-summary';
+    summary.textContent = `${reviewed.records.length} repository-specific malware records. Campaign-only and unverified leads are excluded.`;
     container.append(summary);
-    for (const item of reviewed.reviews || []) {
-      const card = document.createElement('article');
-      card.className = 'campaign review-caution';
-      card.dataset.status = 'UNKNOWN';
-      const title = document.createElement('h3');
-      title.className = 'record-title';
-      title.append(statusBadge('UNKNOWN'), document.createTextNode(item.repository));
-      const note = document.createElement('p');
-      note.textContent = item.observations.join('. ') + '. ' + item.limits;
-      const link = document.createElement('a');
-      link.textContent = 'Inspect the recorded commit';
-      link.href = item.evidence_url;
-      link.rel = 'noreferrer';
-      card.append(title, note, link);
-      container.append(card);
-    }
-    for (const item of reviewed.repositories) {
-      const card = document.createElement('article');
-      card.className = 'campaign review-danger';
-      card.dataset.status = 'FAIL';
-      const title = document.createElement('h3');
-      title.className = 'record-title';
-      title.append(statusBadge('FAIL'), document.createTextNode(item.repository));
-      const note = document.createElement('p');
-      note.textContent = `${item.campaign} · ${item.source_name} · ${item.published}`;
-      const link = document.createElement('a');
-      link.textContent = 'Read the evidence';
-      link.href = item.source_url;
-      link.rel = 'noreferrer';
-      card.append(title, note, link);
-      container.append(card);
-    }
-    for (const item of history.observations.slice(0, 10)) {
-      const row = document.createElement('p');
-      row.className = 'history-row';
-      row.append(statusBadge(item.status), document.createTextNode(`${item.target} · ${item.recorded_at}`));
-      container.append(row);
-    }
+    const head = document.createElement('div');
+    head.className = 'record-table-head';
+    head.innerHTML = '<span></span><span>Repository</span><span>Malware</span><span>Recorded</span><span></span>';
+    container.append(head);
+    for (const item of reviewed.records) container.append(renderRecord(item));
   } catch (error) { renderError(container, error.message); }
   filterRecords();
+}
+
+function formatDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value || '');
+  return match ? `${match[2]}/${match[3]}/${match[1]}` : value;
+}
+
+function detailField(label, value, code = false) {
+  const block = document.createElement('div');
+  block.className = 'record-field';
+  const heading = document.createElement('h4');
+  heading.textContent = label;
+  const content = document.createElement(code ? 'code' : 'p');
+  content.textContent = value;
+  block.append(heading, content);
+  return block;
+}
+
+function renderRecord(item) {
+  const row = document.createElement('details');
+  row.className = 'record-row';
+  row.dataset.status = item.status;
+  const summary = document.createElement('summary');
+  summary.append(statusBadge(item.status));
+  const repository = document.createElement('strong');
+  repository.className = 'record-repository';
+  repository.textContent = item.repository;
+  const malware = document.createElement('span');
+  malware.className = 'record-malware';
+  malware.textContent = item.malware;
+  const date = document.createElement('time');
+  date.dateTime = item.recorded_on;
+  date.textContent = formatDate(item.recorded_on);
+  summary.append(repository, malware, date, icon('chevron-down', 'record-chevron'));
+
+  const body = document.createElement('div');
+  body.className = 'record-body';
+  const fields = document.createElement('div');
+  fields.className = 'record-fields';
+  fields.append(
+    detailField('What it promised', item.lure),
+    detailField('What Ward confirmed', item.finding),
+    detailField('Exact location', `${item.repository} · release ${item.release} · ${item.malicious_path}`, true),
+    detailField('What it can do', item.behavior),
+    detailField('Symptoms to check', item.symptoms),
+    detailField('What to do', item.remediation),
+  );
+  const scope = document.createElement('p');
+  scope.className = 'record-scope';
+  scope.textContent = item.scope;
+  const actions = document.createElement('div');
+  actions.className = 'record-actions';
+  const ward = document.createElement('a');
+  ward.href = `/api/record?repository=${encodeURIComponent(item.repository)}`;
+  ward.textContent = 'Open Ward scan data';
+  const malwareDb = document.createElement('a');
+  malwareDb.href = item.malware_db_url;
+  malwareDb.rel = 'noreferrer';
+  malwareDb.textContent = `View observed XMRig family data on ${item.malware_db_name}`;
+  actions.append(ward, malwareDb);
+  body.append(fields, scope, actions);
+  row.append(summary, body);
+  return row;
 }
 
 function filterRecords() {
   const text = document.querySelector('#record-filter').value.toLowerCase();
   const status = document.querySelector('#record-status').value;
-  for (const card of document.querySelectorAll('#reviewed article')) {
+  for (const card of document.querySelectorAll('#reviewed details')) {
     card.hidden = !card.textContent.toLowerCase().includes(text) || (status !== 'ALL' && card.dataset.status !== status);
   }
 }
 document.querySelector('#record-filter').addEventListener('input', filterRecords);
 document.querySelector('#record-status').addEventListener('change', filterRecords);
+for (const item of document.querySelectorAll('[data-status-key]')) {
+  item.prepend(statusBadge(item.dataset.statusKey));
+}
 loadReviewed();
 

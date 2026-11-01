@@ -1,4 +1,4 @@
-# If you ran a suspicious emulator download
+# If you ran a suspicious GitHub download
 
 Do not panic, but treat saved passwords and active sessions as potentially
 exposed until you know what happened.

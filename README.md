@@ -1,16 +1,19 @@
-# Emulator Safety Watch
+# Ward
 
 Public site: [ward.lley.cat](https://ward.lley.cat)
 
-[Reviewed results and status history](docs/RESULTS.md) records 25 repositories
-named by primary security research and 12 confirmed SHA-256 indicators.
+[Reviewed results and status history](docs/RESULTS.md) records 25 historical
+repository warnings named by primary security research and 12 confirmed
+SHA-256 indicators. The public malware database is stricter: it currently has
+three repository records where the source identifies the repository, release
+archive, and malicious path. Campaign-only associations remain in Coverage.
 Community reports use the repository issue form and begin as UNKNOWN.
 
 The [November 1 investigation](docs/HUNT-2026-11-01.md) covers 125 indexed PS5
 repositories, two unresolved provenance leads, and current availability of
 historical campaign repositories.
 
-Emulator Safety Watch helps people check whether a GitHub download is coming
+Ward helps people check whether a GitHub download is coming
 from the project they intended to visit. It also compares local files against a
 small, evidence-backed malware hash registry.
 
@@ -104,15 +107,17 @@ came from, but it still does not guarantee that the file is safe.
 
 ## Current advisory status
 
-The initial PS5 campaign record is in `src/emuwatch/advisories/campaigns.json`.
-It has no confirmed PS5 repository or hash indicators. Separate GodLoader,
-Minecraft, Webrat, GitVenom, and Yoba records have primary research behind their indicators.
+News and threat research are kept in `src/emuwatch/advisories/campaigns.json`.
+The initial PS5 campaign has no confirmed PS5 repository or hash indicators.
+Repository-specific malware records are stored separately in
+`src/emuwatch/advisories/malware-records.json`; campaign coverage alone is not
+enough to enter that database.
 
 Known project locations are listed separately in
 `src/emuwatch/advisories/project-locations.json`. They are identity anchors, not blanket
 safety guarantees.
 
-## If you already ran a suspicious emulator
+## If you already ran a suspicious download
 
 1. Disconnect the affected computer from the network.
 2. From a different, known-clean device, change your email password first, then

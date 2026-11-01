@@ -37,7 +37,7 @@ def _print_human(result: dict) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="emuwatch",
-        description="Check emulator repositories and files without executing or uploading them.",
+        description="Check GitHub repositories and files without executing or uploading them.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

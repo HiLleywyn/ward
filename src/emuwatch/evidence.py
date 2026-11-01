@@ -17,6 +17,18 @@ def reviewed_repositories() -> list[dict]:
     return [dict(payload["sources"][item["source"]], **item, scope=payload["scope"]) for item in payload["repositories"]]
 
 
+def malware_records() -> list[dict]:
+    path = advisory_directory() / "malware-records.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload["records"]
+
+
+def malware_record(target: str) -> dict | None:
+    owner, name = parse_repository_target(target)
+    key = f"{owner}/{name}".lower()
+    return next((item for item in malware_records() if item["repository"].lower() == key), None)
+
+
 def repository_warning(target: str) -> Assessment | None:
     owner, name = parse_repository_target(target)
     key = f"{owner}/{name}".lower()

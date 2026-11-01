@@ -3,18 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Check emulator downloads without running or uploading them.">
-  <title>Ward · Download safety for players</title>
+  <meta name="description" content="Check GitHub repositories and downloads without running or uploading them.">
+  <title>Ward · GitHub download safety</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div class="stars" aria-hidden="true"></div>
   <main>
     <header class="hero">
-      <div class="mascot" aria-hidden="true">🛡️</div>
+      <div class="mascot" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>
+          <path d="m9 12 2 2 4-4"></path>
+        </svg>
+      </div>
       <div>
         <p class="eyebrow">WARD · PLAYER TWO FOR DOWNLOAD SAFETY</p>
-        <h1>Is this emulator download sketchy?</h1>
+        <h1>Is this GitHub download sketchy?</h1>
         <p class="lede">Paste a GitHub link or drop a file. Nothing gets run. Files never leave your device.</p>
       </div>
     </header>
@@ -59,7 +64,7 @@
       <h2 id="guide-title">Three rules before you hit Run</h2>
       <div class="rule-grid">
         <article><span>1UP</span><h3>Follow the project</h3><p>Start from the developer's own site or profile. A familiar repo name proves nothing.</p></article>
-        <article><span>ARMOR</span><h3>Never nerf Defender</h3><p>An emulator should not need exclusions, disabled antivirus, or mystery admin commands.</p></article>
+        <article><span>ARMOR</span><h3>Never nerf Defender</h3><p>A GitHub project should not need exclusions, disabled antivirus, or mystery admin commands.</p></article>
         <article><span>SAVE</span><h3>Keep the receipt</h3><p>Save the repo URL, release URL, and SHA-256. Those details make takedowns possible.</p></article>
       </div>
     </section>
@@ -68,30 +73,30 @@
       <div class="section-heading">
         <span class="number">03</span>
         <div>
-          <h2 id="watch-title">Campaign watch</h2>
-          <p>Evidence-backed warnings, with missing details shown instead of guessed.</p>
+          <h2 id="watch-title">Coverage &amp; research</h2>
+          <p>News and threat reports live here. They do not become malware records without repository-specific evidence.</p>
         </div>
       </div>
       <div id="campaigns" class="campaigns" aria-live="polite">
-        <p class="loading">Loading the watchlist...</p>
+        <p class="loading">Loading coverage...</p>
       </div>
     </section>
   </main>
   <section class="checker results-history" aria-labelledby="reviewed-title">
-    <h2 id="reviewed-title">The record</h2>
+    <h2 id="reviewed-title">Malware records</h2>
     <div class="status-key" aria-label="Result key">
-      <span><span class="status-icon danger" aria-hidden="true">X</span> Known malware report</span>
-      <span><span class="status-icon caution" aria-hidden="true">~</span> Unverified / investigating</span>
-      <span><span class="status-icon good" aria-hidden="true">✓</span> Specific check verified</span>
+      <span data-status-key="FAIL">Confirmed malicious record</span>
+      <span data-status-key="UNKNOWN">Unverified / investigating</span>
+      <span data-status-key="PASS">Specific check verified</span>
     </div>
-    <p class="fine-print">A verified check confirms only the stated evidence, such as a file's source. It does not guarantee safety.</p>
+    <p class="fine-print">Only repository-specific evidence is published here. Campaign associations and unresolved leads stay in Coverage or out of the database.</p>
     <div class="input-row record-controls">
-      <label for="record-filter">Find a repository or campaign<input id="record-filter" type="text" placeholder="Minecraft, Webrat, repository name..."></label>
-      <label for="record-status">Result<select id="record-status"><option value="ALL">All results</option><option value="FAIL">X · Known malware report</option><option value="UNKNOWN">~ · Unverified / investigating</option></select></label>
+      <label for="record-filter">Find a repository or malware family<input id="record-filter" type="text" placeholder="Repository or malware name..."></label>
+      <label for="record-status">Result<select id="record-status"><option value="ALL">All results</option><option value="FAIL">Confirmed malicious</option><option value="UNKNOWN">Unverified / investigating</option><option value="PASS">Specific check verified</option></select></label>
     </div>
     <div id="reviewed" aria-live="polite"></div>
   </section>
-  <footer>By Lleywyn · <a href="https://github.com/HiLleywyn/emulator-safety-watch">Source &amp; evidence</a> · <a href="https://github.com/HiLleywyn/emulator-safety-watch/issues/new?template=report.yml">Report a suspicious download</a></footer>
+  <footer>By Lleywyn · <a href="https://github.com/HiLleywyn/ward">Source &amp; evidence</a> · <a href="https://github.com/HiLleywyn/ward/issues/new?template=report.yml">Report a suspicious download</a></footer>
   <script src="/app.js"></script>
 </body>
 </html>

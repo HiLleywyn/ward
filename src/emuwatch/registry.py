@@ -45,6 +45,26 @@ def validate_registry(directory: Path) -> list[RegistryProblem]:
     known_assets = _load(directory / "known-project-assets.json", problems)
     projects = _load(directory / "project-locations.json", problems)
     campaigns = _load(directory / "campaigns.json", problems)
+    records = _load(directory / "malware-records.json", problems)
+    seen_record_repositories: set[str] = set()
+    for index, item in enumerate(records.get("records", [])):
+        location = f"$.records[{index}]"
+        repository = str(item.get("repository", "")).lower()
+        if repository in seen_record_repositories:
+            problems.append(RegistryProblem("malware-records.json", location + ".repository", "duplicate repository"))
+        seen_record_repositories.add(repository)
+        for field in (
+            "id", "repository", "status", "malware", "recorded_on", "lure", "release", "artifact",
+            "malicious_path", "finding", "behavior", "symptoms", "remediation", "source_name",
+            "source_url", "malware_db_name", "malware_db_url", "scope",
+        ):
+            if not item.get(field):
+                problems.append(RegistryProblem("malware-records.json", location + f".{field}", "required"))
+        if item.get("status") != "FAIL":
+            problems.append(RegistryProblem("malware-records.json", location + ".status", "published malware records must be FAIL"))
+        for field in ("source_url", "malware_db_url"):
+            if item.get(field) and not _https(item[field]):
+                problems.append(RegistryProblem("malware-records.json", location + f".{field}", "must be HTTPS"))
     repository_file = directory / "repositories.json"
     if repository_file.exists():
         repositories = _load(repository_file, problems)

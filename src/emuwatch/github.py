@@ -35,7 +35,7 @@ class GitHubClient:
             f"{self.api_url}/{path.lstrip('/')}",
             headers={
                 "Accept": "application/vnd.github+json",
-                "User-Agent": "emulator-safety-watch/0.1",
+                "User-Agent": "ward-github-scanner/0.3",
                 "X-GitHub-Api-Version": "2022-11-28",
                 **({"Authorization": f"Bearer {self.token}"} if self.token else {}),
             },
