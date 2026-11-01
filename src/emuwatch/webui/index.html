@@ -79,10 +79,15 @@
   </main>
   <section class="checker results-history" aria-labelledby="reviewed-title">
     <h2 id="reviewed-title">The record</h2>
-    <p>FAIL means a primary report identifies campaign infrastructure. UNKNOWN means further review is needed. PASS can only describe a specific reviewed check, never blanket safety.</p>
+    <div class="status-key" aria-label="Result key">
+      <span><span class="status-icon danger" aria-hidden="true">X</span> Known malware report</span>
+      <span><span class="status-icon caution" aria-hidden="true">~</span> Unverified / investigating</span>
+      <span><span class="status-icon good" aria-hidden="true">✓</span> Specific check verified</span>
+    </div>
+    <p class="fine-print">A verified check confirms only the stated evidence, such as a file's source. It does not guarantee safety.</p>
     <div class="input-row record-controls">
       <label for="record-filter">Find a repository or campaign<input id="record-filter" type="text" placeholder="Minecraft, Webrat, repository name..."></label>
-      <label for="record-status">Result<select id="record-status"><option value="ALL">All results</option><option value="FAIL">Fail: source-backed warning</option><option value="UNKNOWN">Unknown: needs review</option></select></label>
+      <label for="record-status">Result<select id="record-status"><option value="ALL">All results</option><option value="FAIL">X · Known malware report</option><option value="UNKNOWN">~ · Unverified / investigating</option></select></label>
     </div>
     <div id="reviewed" aria-live="polite"></div>
   </section>

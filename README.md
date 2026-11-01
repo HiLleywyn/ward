@@ -3,7 +3,7 @@
 Public site: [ward.lley.cat](https://ward.lley.cat)
 
 [Reviewed results and status history](docs/RESULTS.md) records 25 repositories
-named by primary security research and six confirmed SHA-256 indicators.
+named by primary security research and 12 confirmed SHA-256 indicators.
 Community reports use the repository issue form and begin as UNKNOWN.
 
 The [November 1 investigation](docs/HUNT-2026-11-01.md) covers 125 indexed PS5
@@ -105,8 +105,8 @@ came from, but it still does not guarantee that the file is safe.
 ## Current advisory status
 
 The initial PS5 campaign record is in `src/emuwatch/advisories/campaigns.json`.
-It has no confirmed PS5 repository or hash indicators. Separate Minecraft,
-Webrat, GitVenom, and Yoba records have primary research behind their indicators.
+It has no confirmed PS5 repository or hash indicators. Separate GodLoader,
+Minecraft, Webrat, GitVenom, and Yoba records have primary research behind their indicators.
 
 Known project locations are listed separately in
 `src/emuwatch/advisories/project-locations.json`. They are identity anchors, not blanket
@@ -145,6 +145,7 @@ dual-use security research.
 
 ## Sources
 
+- [Check Point Research, "Gaming Engines: An Undetected Playground for Malware Loaders"](https://research.checkpoint.com/2024/gaming-engines-an-undetected-playground-for-malware-loaders/), November 27, 2024
 - [TechSpot, "Gamers hunting for PS5 emulators on GitHub are downloading malware instead"](https://www.techspot.com/news/114376-gamers-hunting-ps5-emulators-actually-downloading-malware-instead.html), October 29, 2026
 - [Tom's Hardware, "Fake PS5 emulators are being used to steal gamers' passwords"](https://www.tomshardware.com/tech-industry/cyber-security/fake-ps5-emulators-are-being-used-to-infect-gamers-computers-with-password-scraping-malware-two-well-known-github-repos-including-anyps5-hit), October 29, 2026
 - [GitHub REST API release metadata](https://docs.github.com/en/rest/releases) for project identity, asset size, and SHA-256 records

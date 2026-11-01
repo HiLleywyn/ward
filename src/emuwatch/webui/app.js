@@ -6,6 +6,22 @@ const fileInput = document.querySelector("#file-input");
 const fileResult = document.querySelector("#file-result");
 const dropZone = document.querySelector("#drop-zone");
 
+const statusInfo = {
+  FAIL: {icon: 'X', label: 'Known malware report or exact malware match', tone: 'danger'},
+  UNKNOWN: {icon: '~', label: 'Unverified or still under investigation', tone: 'caution'},
+  PASS: {icon: '✓', label: 'Specific check verified; not a guarantee of safety', tone: 'good'},
+};
+
+function statusBadge(status) {
+  const info = statusInfo[status] || statusInfo.UNKNOWN;
+  const badge = document.createElement('span');
+  badge.className = `status-icon ${info.tone}`;
+  badge.textContent = info.icon;
+  badge.title = info.label;
+  badge.setAttribute('aria-label', info.label);
+  return badge;
+}
+
 function resultClass(verdict) {
   if (["confirmed-malicious-indicator", "confirmed-malicious-asset", "reported-malicious-repository", "high-risk-metadata"].includes(verdict)) return "danger";
   if (["needs-review", "caution"].includes(verdict)) return "caution";
@@ -35,9 +51,8 @@ function renderResult(container, result) {
   head.className = "result-head";
   const title = document.createElement("h3");
   title.textContent = verdictTitle(result.verdict);
-  const badge = document.createElement("span");
-  badge.className = "badge";
-  badge.textContent = result.status || (result.verdict === "confirmed-malicious-indicator" ? "FAIL" : "UNKNOWN");
+  const confirmed = ['confirmed-malicious-indicator', 'confirmed-malicious-asset', 'reported-malicious-repository'].includes(result.verdict);
+  const badge = statusBadge(confirmed ? 'FAIL' : result.verdict === 'known-project-artifact' ? 'PASS' : 'UNKNOWN');
   head.append(title, badge);
   container.append(head);
 
@@ -173,9 +188,12 @@ async function loadCampaigns() {
       top.className = "campaign-top";
       const title = document.createElement("h3");
       title.textContent = campaign.impersonated_projects.join(" + ");
-      const status = document.createElement("span");
-      status.className = "status";
-      status.textContent = campaign.status.replaceAll("-", " ");
+      const hasConfirmedFiles = Array.isArray(campaign.confirmed_sha256) && campaign.confirmed_sha256.length > 0;
+      const status = statusBadge(hasConfirmedFiles ? 'FAIL' : 'UNKNOWN');
+      status.title = hasConfirmedFiles
+        ? `${campaign.confirmed_sha256.length} confirmed malicious file hashes published`
+        : 'Campaign reported; exact files are not confirmed';
+      status.setAttribute('aria-label', status.title);
       top.append(title, status);
       const note = document.createElement("p");
       note.textContent = campaign.validation_notes;
@@ -186,6 +204,13 @@ async function loadCampaigns() {
         list.append(item);
       }
       card.append(top, note, list);
+      if (campaign.evidence?.[0]?.url) {
+        const source = document.createElement('a');
+        source.href = campaign.evidence[0].url;
+        source.rel = 'noreferrer';
+        source.textContent = 'Read the source report';
+        card.append(source);
+      }
       container.append(card);
     }
   } catch (error) {
@@ -208,10 +233,11 @@ async function loadReviewed() {
     container.append(summary);
     for (const item of reviewed.reviews || []) {
       const card = document.createElement('article');
-      card.className = 'campaign';
+      card.className = 'campaign review-caution';
       card.dataset.status = 'UNKNOWN';
       const title = document.createElement('h3');
-      title.textContent = `UNKNOWN · ${item.repository}`;
+      title.className = 'record-title';
+      title.append(statusBadge('UNKNOWN'), document.createTextNode(item.repository));
       const note = document.createElement('p');
       note.textContent = item.observations.join('. ') + '. ' + item.limits;
       const link = document.createElement('a');
@@ -223,10 +249,11 @@ async function loadReviewed() {
     }
     for (const item of reviewed.repositories) {
       const card = document.createElement('article');
-      card.className = 'campaign';
+      card.className = 'campaign review-danger';
       card.dataset.status = 'FAIL';
       const title = document.createElement('h3');
-      title.textContent = `FAIL · ${item.repository}`;
+      title.className = 'record-title';
+      title.append(statusBadge('FAIL'), document.createTextNode(item.repository));
       const note = document.createElement('p');
       note.textContent = `${item.campaign} · ${item.source_name} · ${item.published}`;
       const link = document.createElement('a');
@@ -238,7 +265,8 @@ async function loadReviewed() {
     }
     for (const item of history.observations.slice(0, 10)) {
       const row = document.createElement('p');
-      row.textContent = `${item.status} · ${item.target} · ${item.recorded_at}`;
+      row.className = 'history-row';
+      row.append(statusBadge(item.status), document.createTextNode(`${item.target} · ${item.recorded_at}`));
       container.append(row);
     }
   } catch (error) { renderError(container, error.message); }
