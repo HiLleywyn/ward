@@ -13,12 +13,13 @@ The [November 1 investigation](docs/HUNT-2026-11-01.md) covers 125 indexed PS5
 repositories, two unresolved provenance leads, and current availability of
 historical campaign repositories.
 
-Ward helps people check whether a GitHub download is coming
-from the project they intended to visit. It also compares local files against a
-small, evidence-backed malware hash registry.
+Ward clones public HTTPS Git repositories into a constrained container, records
+the exact commit, hashes bounded files, inspects scripts and small archives, and
+compares content against an evidence-backed malware indicator registry. It does
+not execute repository code, installers, build scripts, or package hooks.
 
-It never downloads release assets, executes programs, uploads files, or treats
-a heuristic score as proof of malware.
+The public interface keeps every completed repository scan in a recent-scan
+directory. A scan without a match is `Unverified`, never a safety guarantee.
 
 ## Why this exists
 
@@ -29,13 +30,13 @@ information stealer, and removed traces afterward.
 
 The public reports did not provide repository URLs or file hashes. That means a
 responsible warning list cannot name random same-name repositories as malware.
-This project therefore keeps three claims separate:
+This project keeps three claims separate:
 
 1. **Exact indicator match:** a file hash or URL matches evidence in the public
    registry.
 2. **High-risk metadata:** a repository combines impersonation signals with
    dangerous instructions or suspicious release structure.
-3. **No strong signals:** the metadata-only check found nothing decisive. This
+3. **No strong signals:** the bounded static scan found nothing decisive. This
    is not a safety guarantee.
 
 ## Install
@@ -59,16 +60,20 @@ emuwatch repo OWNER/REPOSITORY --json
 The checker reads repository metadata, public account metadata, release asset
 names and sizes, and README text. It does not request release asset contents.
 
-## Use the interactive checker
+## Use the repository scanner
 
 ```powershell
 emuwatch web
 ```
 
-This opens a local interface at `http://127.0.0.1:8787`. Paste a GitHub link or
-drop a file onto the page. Repository checks go directly to GitHub's public API.
-File hashing happens inside your browser, so the file is not sent to the local
-server or anywhere else.
+This opens a local interface at `http://127.0.0.1:8787`. Paste a GitHub shorthand,
+a GitHub URL, or another public HTTPS Git URL. Ward clones the repository into a
+temporary directory, inspects it without running its code, stores the scan
+record, then removes the checkout. Public scans are serialized, size-bounded,
+and rate-limited.
+
+The public interface no longer accepts file uploads. Local file hashing remains
+available through the CLI below, where the file stays on your machine.
 
 ## Hunt for rotating lookalikes
 
@@ -77,8 +82,8 @@ emuwatch hunt anyps5 --limit 20
 emuwatch hunt kytyps5 --limit 50 --min-score 45 --json
 ```
 
-Hunt mode searches GitHub by known project names, then applies the same
-metadata-only checks to a bounded number of repositories. Its output is a
+Hunt mode searches GitHub by known project names, then applies bounded
+metadata checks to a limited number of repositories. Its output is a
 private review queue, not a malware blacklist. A repository must still be
 validated before an indicator is published or a platform report is sent.
 
@@ -168,10 +173,12 @@ the audit trail. UNKNOWN means review is needed; FAIL means a confirmed exact
 indicator or a repository named in primary research. PASS applies only to a
 specific reviewed claim and never means a program is guaranteed safe.
 
-Public mode hides local history and file paths. File hashes stay in your
-browser. Public GitHub checks are cached for 15 minutes and globally capped at
-eight fresh checks per hour to fit the unauthenticated API allowance. Confirmed
-repository warnings and local file hashing keep working during cooldown.
+Public mode hides legacy local history and local file paths. Repository scan
+records are intentionally public and contain repository paths, commit IDs,
+findings, hashes that matched known indicators, and scan limits. The scanner is
+globally capped at six clone attempts per hour and one active clone at a time.
+The legacy GitHub metadata endpoint is cached for 15 minutes and capped at eight
+fresh checks per hour. Local file hashing remains CLI-only.
 
 Maintained by Lleywyn. No analytics or advertising scripts are included.
 

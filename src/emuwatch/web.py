@@ -15,6 +15,7 @@ from .analyze import assess_repository, parse_repository_target
 from .github import GitHubClient, GitHubError
 from .data import advisory_directory
 from .evidence import default_store, malware_record, malware_records, repository_warning, snapshot_evidence
+from .scanner import ScanError, normalize_repository_url, scan_repository
 
 
 WEB_ROOT = Path(__file__).with_name("webui")
@@ -28,10 +29,13 @@ def _handler() -> type[BaseHTTPRequestHandler]:
     store = default_store()
     cache = {}
     checks = deque()
+    scans = deque()
     check_lock = threading.Lock()
+    scan_lock = threading.Lock()
+    scan_slot = threading.BoundedSemaphore(1)
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "Ward/0.3"
+        server_version = "Ward/0.4"
         sys_version = ""
 
         def setup(self):
@@ -115,6 +119,9 @@ def _handler() -> type[BaseHTTPRequestHandler]:
             if request.path == "/api/history":
                 self._send_json({"observations": [] if public else store.history()})
                 return
+            if request.path == "/api/scans":
+                self._send_json({"scans": store.recent_repository_scans(20)})
+                return
             route = routes.get(request.path)
             if route is None:
                 self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
@@ -136,7 +143,8 @@ def _handler() -> type[BaseHTTPRequestHandler]:
             if origin and origin not in {"https://ward.lley.cat", f"http://{self.headers.get('Host')}"}:
                 self._send_json({"error": "Invalid origin"}, HTTPStatus.FORBIDDEN)
                 return
-            if self.path != "/api/check-repo":
+            request = urlsplit(self.path)
+            if request.path not in {"/api/check-repo", "/api/scan-repo"}:
                 self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
                 return
             try:
@@ -146,6 +154,26 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 payload = json.loads(self.rfile.read(length))
                 if not isinstance(payload, dict):
                     raise ValueError("Request must be a JSON object")
+                if request.path == "/api/scan-repo":
+                    target = normalize_repository_url(str(payload.get("target", "")))
+                    now = time.monotonic()
+                    with scan_lock:
+                        while scans and now - scans[0] > 3600:
+                            scans.popleft()
+                        if public and len(scans) >= 6:
+                            self._send_json({"error": "The public scanner is cooling down. Try again later."}, HTTPStatus.TOO_MANY_REQUESTS)
+                            return
+                        if not scan_slot.acquire(blocking=False):
+                            self._send_json({"error": "Another repository scan is running. Try again in a moment."}, HTTPStatus.TOO_MANY_REQUESTS)
+                            return
+                        scans.append(now)
+                    try:
+                        result = scan_repository(target)
+                        store.record_repository_scan(result)
+                    finally:
+                        scan_slot.release()
+                    self._send_json(result)
+                    return
                 owner, repository = parse_repository_target(str(payload.get("target", "")))
                 assessment = repository_warning(f"{owner}/{repository}")
                 evidence = None
@@ -173,7 +201,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 result = assessment.to_dict()
                 result["status"] = "FAIL" if assessment.exact_indicator_match else "UNKNOWN"
                 self._send_json(result)
-            except (GitHubError, ValueError, json.JSONDecodeError) as exc:
+            except (GitHubError, ScanError, ValueError, json.JSONDecodeError) as exc:
                 self._send_json({"error": str(exc)[:500]}, HTTPStatus.BAD_REQUEST)
 
         def log_message(self, format: str, *args: object) -> None:

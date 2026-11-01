@@ -1,7 +1,7 @@
 services:
   ward:
     build: .
-    image: ward:0.3.0
+    image: ward:0.4.0
     container_name: ward
     restart: unless-stopped
     ports:
@@ -10,10 +10,10 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     pids_limit: 64
-    mem_limit: 256m
+    mem_limit: 512m
     cpus: 1.0
     tmpfs:
-      - /tmp:size=16m,noexec,nosuid,nodev
+      - /tmp:size=256m,noexec,nosuid,nodev
     volumes:
       - ward-state:/state
     networks:

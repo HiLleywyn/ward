@@ -85,6 +85,31 @@ class ResultStore:
         status = "FAIL" if assessment.exact_indicator_match else "UNKNOWN"
         return self.record(assessment.target, {"assessment": assessment.to_dict(), "snapshot": snapshot}, status=status)
 
+    def record_repository_scan(self, result: dict) -> str:
+        status = "FAIL" if result.get("status") in {"Malicious", "Corroborated"} else "UNKNOWN"
+        record_id = result.get("id") or str(uuid4())
+        payload = dict(result, id=record_id)
+        with self.connect() as connection:
+            connection.execute("INSERT INTO observations VALUES (?, ?, ?, ?, ?, ?)", (
+                record_id,
+                result.get("scanned_at") or datetime.now(timezone.utc).isoformat(),
+                result["repository"],
+                status,
+                "repository-scan",
+                json.dumps(payload, sort_keys=True),
+            ))
+        return record_id
+
+    def recent_repository_scans(self, limit: int = 20) -> list[dict]:
+        if not 1 <= limit <= 100:
+            raise ValueError("Scan history limit must be 1 to 100")
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT payload FROM observations WHERE kind = 'repository-scan' ORDER BY rowid DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
     def report(self, target: str, evidence_url: str, description: str) -> str:
         owner, name = parse_repository_target(target)
         from urllib.parse import urlparse

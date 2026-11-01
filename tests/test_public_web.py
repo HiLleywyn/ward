@@ -44,3 +44,39 @@ class PublicWebTests(unittest.TestCase):
                     server.shutdown()
                     server.server_close()
                     thread.join()
+
+    def test_repository_scan_is_persisted_and_returned(self):
+        result = {
+            'id': 'scan-fixture',
+            'repository': 'owner/repository',
+            'repository_url': 'https://github.com/owner/repository',
+            'commit': 'a' * 40,
+            'status': 'Unverified',
+            'scanned_at': '2026-11-01T12:00:00+00:00',
+            'duration_ms': 125,
+            'summary': {'files': 2, 'bytes': 30, 'hashed_bytes': 30, 'text_files': 1, 'archives': 0, 'executable_files': 0, 'truncated': False},
+            'findings': [],
+            'sources': [],
+            'limitations': ['No match does not prove safety.'],
+        }
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'EMUWATCH_PUBLIC':'1','EMUWATCH_STATE_DIR':temp}):
+            with patch('emuwatch.web.scan_repository', return_value=result):
+                server = BoundedHTTPServer(('127.0.0.1',0), _handler())
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                base = f'http://127.0.0.1:{server.server_port}'
+                try:
+                    request = Request(
+                        base + '/api/scan-repo',
+                        data=json.dumps({'target':'https://github.com/owner/repository'}).encode(),
+                        headers={'Content-Type':'application/json'},
+                    )
+                    with urlopen(request, timeout=3) as response:
+                        self.assertEqual(json.load(response)['id'], 'scan-fixture')
+                    with urlopen(base + '/api/scans', timeout=3) as response:
+                        scans = json.load(response)['scans']
+                    self.assertEqual([item['id'] for item in scans], ['scan-fixture'])
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join()
