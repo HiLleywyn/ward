@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Check emulator downloads without running or uploading them.">
-  <title>Emulator Safety Watch</title>
+  <title>Ward · Download safety for players</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
     <header class="hero">
       <div class="mascot" aria-hidden="true">🛡️</div>
       <div>
-        <p class="eyebrow">PLAYER TWO FOR DOWNLOAD SAFETY</p>
+        <p class="eyebrow">WARD · PLAYER TWO FOR DOWNLOAD SAFETY</p>
         <h1>Is this emulator download sketchy?</h1>
         <p class="lede">Paste a GitHub link or drop a file. Nothing gets run. Files never leave your device.</p>
       </div>
@@ -77,7 +77,16 @@
       </div>
     </section>
   </main>
-  <footer>Built for players. Evidence first. No file uploads. No automatic accusations.</footer>
+  <section class="checker results-history" aria-labelledby="reviewed-title">
+    <h2 id="reviewed-title">The record</h2>
+    <p>FAIL means a primary report identifies campaign infrastructure. UNKNOWN means further review is needed. PASS can only describe a specific reviewed check, never blanket safety.</p>
+    <div class="input-row record-controls">
+      <label for="record-filter">Find a repository or campaign<input id="record-filter" type="text" placeholder="Minecraft, Webrat, repository name..."></label>
+      <label for="record-status">Result<select id="record-status"><option value="ALL">All results</option><option value="FAIL">Fail: source-backed warning</option><option value="UNKNOWN">Unknown: needs review</option></select></label>
+    </div>
+    <div id="reviewed" aria-live="polite"></div>
+  </section>
+  <footer>By Lleywyn · <a href="https://github.com/HiLleywyn/emulator-safety-watch">Source &amp; evidence</a> · <a href="https://github.com/HiLleywyn/emulator-safety-watch/issues/new?template=report.yml">Report a suspicious download</a></footer>
   <script src="/app.js"></script>
 </body>
 </html>

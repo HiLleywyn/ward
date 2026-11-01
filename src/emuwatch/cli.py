@@ -12,10 +12,12 @@ from .discovery import hunt_project
 from .analyze import CANONICAL_PROJECTS
 from .web import serve
 from .registry import validate_registry
+from .data import advisory_directory
+from .evidence import default_store, repository_warning, snapshot_evidence
 
 
 def _default_indicator_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "advisories" / "indicators.json"
+    return advisory_directory() / "indicators.json"
 
 
 def _print_human(result: dict) -> None:
@@ -49,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     file_parser.add_argument(
         "--known-assets",
         type=Path,
-        default=Path(__file__).resolve().parents[2] / "advisories" / "known-project-assets.json",
+        default=advisory_directory() / "known-project-assets.json",
     )
     file_parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
 
@@ -68,14 +70,27 @@ def build_parser() -> argparse.ArgumentParser:
         "directory",
         nargs="?",
         type=Path,
-        default=Path(__file__).resolve().parents[2] / "advisories",
+        default=advisory_directory(),
     )
+    history = subparsers.add_parser("history", help="show persisted scan and community report history")
+    history.add_argument("--limit", type=int, default=100)
+    report = subparsers.add_parser("report", help="record a community lead pending review")
+    report.add_argument("target")
+    report.add_argument("--evidence", required=True)
+    report.add_argument("--description", required=True)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "history":
+            print(json.dumps(default_store().history(args.limit), indent=2))
+            return 0
+        if args.command == "report":
+            record_id = default_store().report(args.target, args.evidence, args.description)
+            print(f"Recorded {record_id}: UNKNOWN, pending review")
+            return 0
         if args.command == "web":
             serve(port=args.port, open_browser=not args.no_open)
             return 0
@@ -113,8 +128,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "repo":
             owner, repository = parse_repository_target(args.target)
-            snapshot = GitHubClient(os.environ.get("GITHUB_TOKEN")).snapshot(owner, repository)
-            assessment = assess_repository(snapshot)
+            assessment = repository_warning(f"{owner}/{repository}")
+            evidence = None
+            if assessment is None:
+                snapshot = GitHubClient(os.environ.get("GITHUB_TOKEN")).snapshot(owner, repository)
+                assessment = assess_repository(snapshot)
+                evidence = snapshot_evidence(snapshot)
+            default_store().record_assessment(assessment, evidence)
         else:
             if not args.path.is_file():
                 raise ValueError(f"File does not exist: {args.path}")
@@ -123,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
                 load_indicators(args.indicators),
                 load_indicators(args.known_assets),
             )
+            default_store().record_assessment(assessment)
     except (GitHubError, OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

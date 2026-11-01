@@ -68,6 +68,17 @@ button:disabled { opacity: .55; cursor: wait; transform: none; }
 
 .result { margin-top: 20px; padding: 18px; border: 1px solid var(--border); border-left-width: 5px; border-radius: 15px; background: rgba(4,7,13,.6); }
 .result.good { border-left-color: var(--green); }
+.result.unknown { border-left-color: var(--cyan); }
+.unknown .badge { background: var(--cyan); }
+.results-history { width: min(1080px, calc(100% - 32px)); margin: 22px auto; }
+.results-history a { color: var(--cyan); }
+.record-controls { margin: 20px 0; }
+.record-controls label { flex: 1; min-width: 0; font-size: .9rem; }
+.record-controls input, .record-controls select { display: block; width: 100%; margin-top: 8px; }
+.record-controls select { min-height: 52px; padding: 0 12px; border: 1px solid #38425f; border-radius: 13px; background: #090c16; color: var(--text); }
+[hidden] { display: none !important; }
+footer a { color: var(--cyan); }
+.results-history h3, .result { overflow-wrap: anywhere; }
 .result.caution { border-left-color: var(--yellow); }
 .result.danger { border-left-color: var(--red); }
 .result.error { border-left-color: var(--red); }

@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from .analyze import CANONICAL_PROJECTS, Assessment, assess_repository
 from .github import GitHubClient, GitHubError
+from .evidence import repository_warning, snapshot_evidence, default_store
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,9 @@ def hunt_project(
             on_progress(full_name)
         try:
             owner, name = full_name.split("/", 1)
-            assessment = assess_repository(client.snapshot(owner, name))
+            snapshot = client.snapshot(owner, name)
+            assessment = repository_warning(full_name) or assess_repository(snapshot)
+            default_store().record_assessment(assessment, snapshot_evidence(snapshot))
             if assessment.score >= minimum_score:
                 assessments.append(assessment)
         except GitHubError as exc:

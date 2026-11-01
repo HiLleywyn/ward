@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-11-01",
+  "coverage": {"indexed_repositories":125,"successful_initial_snapshots":120,"empty_repository_errors":5,"queries":["AnyPS5 in:name","KytyPS5 in:name","KyttyPS5 in:name"],"per_query_cap":100},
+  "reviews": [
+    {
+      "repository":"anyps-5/AnyPS5-Github",
+      "status":"UNKNOWN",
+      "decision":"Verify provenance before downloading",
+      "commit":"3b4092fe399ad99aa214dc2b19bd648ac491a8c0",
+      "earliest_returned_commit":"de159934c74963adb8b0baad8a56752ca19c8749",
+      "earliest_returned_commit_date":"2026-10-22T15:07:07Z",
+      "evidence_url":"https://github.com/anyps-5/AnyPS5-Github/tree/3b4092fe399ad99aa214dc2b19bd648ac491a8c0",
+      "observations":["20 source-named files total 797 bytes","Three sampled source files contain placeholder text instead of an implementation","A release asset named AnyPS5.zip is 37863353 bytes"],
+      "release_sha256":"fdb91546ff9fc51ca8481361a84a94429891c69dc0c3742224eb8ea39b3edfc0",
+      "limits":"Archive contents were not downloaded or executed. Malware and a link to the NordVPN campaign are unconfirmed."
+    },
+    {
+      "repository":"KytyPS5-Emulator-For-PS5/.github",
+      "status":"UNKNOWN",
+      "decision":"Verify provenance before downloading",
+      "commit":"06ad2654a24f68d3821909a1e20fc72b064a2ed5",
+      "earliest_returned_commit":"16df0537327ae459276554fa801a733ca5cea539",
+      "earliest_returned_commit_date":"2026-10-28T07:22:45Z",
+      "evidence_url":"https://github.com/KytyPS5-Emulator-For-PS5/.github/tree/06ad2654a24f68d3821909a1e20fc72b064a2ed5",
+      "observations":["README claims open-source development","Inspected commit contains a profile README, license and images, with zero source files","Release archive is 193557289 bytes"],
+      "release_sha256":"4fa4f08818aa68bf62b2b2b374c19d3aa4fde7b09bf01e194287ce85aba307db",
+      "limits":"Archive contents were not downloaded or executed. Malware and a link to the NordVPN campaign are unconfirmed."
+    }
+  ],
+  "origin_assessment":"The earliest returned commit is only the earliest observation in these two collected histories. It does not establish the first repository, actor, or source of the PS5 campaign."
+}

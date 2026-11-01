@@ -98,14 +98,19 @@ def parse_repository_target(value: str) -> tuple[str, str]:
     value = value.strip()
     if value.startswith(("http://", "https://")):
         parsed = urlparse(value)
-        if parsed.netloc.lower() not in {"github.com", "www.github.com"}:
+        if parsed.netloc.lower() not in {"github.com", "www.github.com"} or parsed.scheme != "https":
             raise ValueError("Only github.com repository URLs are supported")
         parts = [part for part in parsed.path.split("/") if part]
     else:
         parts = [part for part in value.split("/") if part]
     if len(parts) < 2:
         raise ValueError("Use OWNER/REPOSITORY or a github.com repository URL")
-    return parts[0], parts[1].removesuffix(".git")
+    owner, repository = parts[0], parts[1].removesuffix(".git")
+    if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", owner):
+        raise ValueError("Invalid GitHub owner")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", repository) or repository in {".", ".."}:
+        raise ValueError("Invalid GitHub repository")
+    return owner, repository
 
 
 def _parse_time(value: str | None) -> datetime | None:
@@ -154,7 +159,7 @@ def assess_repository(
     now = now or datetime.now(timezone.utc)
     repo = snapshot.repository
     full_name = repo["full_name"]
-    project = _project_for_name(repo["name"])
+    project = _project_for_name(repo["name"] if repo["name"] != ".github" else full_name.split("/", 1)[0])
     canonical = project and full_name.lower() == project["repository"].lower()
     canonical_owner = project and repo.get("owner", {}).get("login", full_name.split("/", 1)[0]).lower() == project["repository"].split("/", 1)[0].lower()
     signals: list[Signal] = []
@@ -175,12 +180,12 @@ def assess_repository(
                 f"This repository belongs to the registry owner for {project['name']}.",
             )
         )
-    elif project and repo.get("fork"):
+    elif project and repo.get("fork") and repo.get("source", {}).get("full_name", "").lower() == project["repository"].lower():
         signals.append(
             Signal(
                 "connected_fork",
                 0,
-                f"GitHub identifies this as a fork connected to another {project['name']} repository.",
+                f"GitHub identifies this as a fork of the registered {project['name']} repository.",
             )
         )
     elif project:
@@ -188,14 +193,14 @@ def assess_repository(
         signals.append(
             Signal(
                 "project_name_lookalike",
-                35 if exact_name else 25,
-                f"The repository name resembles {project['name']}, but the owner is not the registry owner.",
+                35 if exact_name else 5,
+                f"This is a third-party repository using the {project['name']} name. Verify the publisher before using downloads.",
             )
         )
         signals.append(
             Signal(
                 "lookalike_not_fork",
-                15,
+                15 if exact_name else 0,
                 "GitHub does not identify this lookalike as a fork of another repository.",
             )
         )
@@ -212,7 +217,10 @@ def assess_repository(
             signals.append(Signal("new_owner", 10, f"Owner account age is {owner_age} days."))
 
     readme_lower = snapshot.readme.lower()
-    if re.search(r"\b(?:add|set)-mppreference\b", readme_lower):
+    actionable_lines = [line for line in readme_lower.splitlines()
+        if not re.search(r"\b(?:never|don't|do not|must not|should not)\b", line)]
+    instructions = "\n".join(actionable_lines)
+    if re.search(r"\b(?:add|set)-mppreference\b", instructions):
         signals.append(
             Signal(
                 "defender_exclusion_command",
@@ -222,7 +230,7 @@ def assess_repository(
         )
     elif re.search(
         r"(?:disable|turn off|exclude|whitelist).{0,40}(?:antivirus|anti-virus|defender)",
-        readme_lower,
+        instructions,
     ):
         signals.append(
             Signal(
@@ -267,6 +275,10 @@ def assess_repository(
         )
 
     largest_asset = max((int(asset.get("size") or 0) for asset in assets), default=0)
+    tree = snapshot.tree_summary
+    if project and not canonical and not canonical_owner and tree and not tree.get("truncated") and tree.get("source_bytes",0) < 2_000 and largest_asset > 5_000_000:
+        signals.append(Signal("little_source_large_release", 25,
+            f"At the inspected commit, {tree['source_count']} source files total {tree['source_bytes']} bytes while a release exceeds 5 MB. Verify its provenance."))
     repo_kb = int(repo.get("size") or 0)
     if project and not canonical and not canonical_owner and repo_kb < 1_000 and largest_asset > 5_000_000:
         signals.append(
@@ -298,6 +310,7 @@ def assess_repository(
             "Metadata signals are not proof that a repository or file is malicious.",
             "A known project location is not a guarantee that every commit or release is safe.",
             "No release asset was downloaded, opened, uploaded, or executed.",
+            "Only the first 20 release records were inspected. Repository metadata can be incomplete.",
         ],
     )
 
@@ -317,7 +330,8 @@ def assess_file(
             digest.update(chunk)
     sha256 = digest.hexdigest()
     matches = [
-        item for item in indicators.get("indicators", []) if item.get("sha256", "").lower() == sha256
+        item for item in indicators.get("indicators", [])
+        if item.get("sha256", "").lower() == sha256 and item.get("status") == "confirmed"
     ]
     known_matches = [
         item

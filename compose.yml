@@ -1,0 +1,27 @@
+services:
+  ward:
+    build: .
+    image: ward:0.2.0
+    container_name: ward
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8794:8794"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    volumes:
+      - ward-state:/state
+    networks:
+      ingress:
+        aliases: [ward]
+networks:
+  ingress:
+    external: true
+    name: lley-cat_tunnel_egress
+volumes:
+  ward-state:

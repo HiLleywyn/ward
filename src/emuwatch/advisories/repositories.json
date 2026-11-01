@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "minecraft": {"source_name":"Check Point Research","source_url":"https://research.checkpoint.com/2025/minecraft-mod-malware-stargazers/","campaign":"Minecraft Stargazers","published":"2025-06-18"},
+    "webrat": {"source_name":"Kaspersky Securelist","source_url":"https://securelist.com/webrat-distributed-via-github/118555/","campaign":"Webrat fake exploits","published":"2025-12-23"},
+    "gitvenom": {"source_name":"Kaspersky Securelist","source_url":"https://securelist.com/gitvenom-campaign/115694/","campaign":"GitVenom","published":"2025-02-24"},
+    "yoba": {"source_name":"Check Point Research","source_url":"https://research.checkpoint.com/2026/tricks-from-the-past-deployed-via-signed-chatgpt-and-claude-binaries/","campaign":"Yoba fake AI apps","published":"2026-10-27"}
+  },
+  "repositories": [
+    {"repository":"A1phaD3v/Oringo-Client","source":"minecraft","status":"FAIL"},
+    {"repository":"AlphaPigeonDev/Polar-Client","source":"minecraft","status":"FAIL"},
+    {"repository":"AlphaPigeonDev/Skyblock-Extras","source":"minecraft","status":"FAIL"},
+    {"repository":"P1geonD3v/Funny-Map-Extras","source":"minecraft","status":"FAIL"},
+    {"repository":"P1geonD3v/Taunahi-V3","source":"minecraft","status":"FAIL"},
+    {"repository":"RedFoxNxploits/CVE-2025-10294-Poc","source":"webrat","status":"FAIL"},
+    {"repository":"FixingPhantom/CVE-2025-10294","source":"webrat","status":"FAIL"},
+    {"repository":"h4xnz/CVE-2025-10294-POC","source":"webrat","status":"FAIL"},
+    {"repository":"usjnx72726w/CVE-2025-59295","source":"webrat","status":"FAIL"},
+    {"repository":"stalker110119/CVE-2025-59230","source":"webrat","status":"FAIL"},
+    {"repository":"moegameka/CVE-2025-59230","source":"webrat","status":"FAIL"},
+    {"repository":"DebugFrag/CVE-2025-12596-Exploit","source":"webrat","status":"FAIL"},
+    {"repository":"themaxlpalfaboy/CVE-2025-54897-LAB","source":"webrat","status":"FAIL"},
+    {"repository":"DExplo1ted/CVE-2025-54106-POC","source":"webrat","status":"FAIL"},
+    {"repository":"h4xnz/CVE-2025-55234-POC","source":"webrat","status":"FAIL"},
+    {"repository":"Hazelooks/CVE-2025-11499-Exploit","source":"webrat","status":"FAIL"},
+    {"repository":"usjnx72726w/CVE-2025-11499-LAB","source":"webrat","status":"FAIL"},
+    {"repository":"modhopmarrow1973/CVE-2025-11833-LAB","source":"webrat","status":"FAIL"},
+    {"repository":"rootreapers/CVE-2025-11499","source":"webrat","status":"FAIL"},
+    {"repository":"lagerhaker539/CVE-2025-12595-POC","source":"webrat","status":"FAIL"},
+    {"repository":"Dipo17/battle","source":"gitvenom","status":"FAIL"},
+    {"repository":"gpt-5-6/sol-free-desktop","source":"yoba","status":"FAIL"},
+    {"repository":"gpt-5-6/gpt-5-6.github.io","source":"yoba","status":"FAIL"},
+    {"repository":"gpt-6-astra/gpt-6-astra.github.io","source":"yoba","status":"FAIL"},
+    {"repository":"opus-5-0/opus-5-0.github.io","source":"yoba","status":"FAIL"}
+  ],
+  "scope":"The source named this repository as campaign infrastructure at publication. This is a historical path indicator, not attribution of a real person or proof about a future reused account."
+}

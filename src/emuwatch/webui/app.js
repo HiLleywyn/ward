@@ -7,14 +7,15 @@ const fileResult = document.querySelector("#file-result");
 const dropZone = document.querySelector("#drop-zone");
 
 function resultClass(verdict) {
-  if (["confirmed-malicious-indicator", "high-risk-metadata"].includes(verdict)) return "danger";
+  if (["confirmed-malicious-indicator", "reported-malicious-repository", "high-risk-metadata"].includes(verdict)) return "danger";
   if (["needs-review", "caution"].includes(verdict)) return "caution";
-  return "good";
+  return verdict === "known-project-artifact" ? "good" : "unknown";
 }
 
 function verdictTitle(verdict) {
   const titles = {
     "confirmed-malicious-indicator": "Exact known-malware match",
+    "reported-malicious-repository": "Named in a primary malware report",
     "high-risk-metadata": "Stop and verify this one",
     "needs-review": "This needs a closer look",
     "caution": "A few things look unusual",
@@ -35,7 +36,7 @@ function renderResult(container, result) {
   title.textContent = verdictTitle(result.verdict);
   const badge = document.createElement("span");
   badge.className = "badge";
-  badge.textContent = `${result.score}/100`;
+  badge.textContent = result.status || (result.verdict === "confirmed-malicious-indicator" ? "FAIL" : "UNKNOWN");
   head.append(title, badge);
   container.append(head);
 
@@ -93,6 +94,7 @@ repoForm.addEventListener("submit", async (event) => {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "The checker returned an error.");
     renderResult(repoResult, result);
+    loadReviewed();
   } catch (error) {
     renderError(repoResult, error.message);
   } finally {
@@ -104,6 +106,7 @@ repoForm.addEventListener("submit", async (event) => {
 async function checkFile(file) {
   fileResult.hidden = true;
   try {
+    if (file.size > 128 * 1024 * 1024) throw new Error('For files over 128 MB, use the local CLI to calculate a hash without loading the whole file into browser memory.');
     const [buffer, indicatorResponse] = await Promise.all([
       file.arrayBuffer(),
       fetch("/api/indicators"),
@@ -190,4 +193,65 @@ async function loadCampaigns() {
 }
 
 loadCampaigns();
+
+async function loadReviewed() {
+  const container = document.querySelector('#reviewed');
+  try {
+    const [reviewedResponse, historyResponse] = await Promise.all([fetch('/api/reviewed'), fetch('/api/history')]);
+    if (!reviewedResponse.ok || !historyResponse.ok) throw new Error('Result history unavailable');
+    const reviewed = await reviewedResponse.json();
+    const history = await historyResponse.json();
+    container.replaceChildren();
+    const summary = document.createElement('p');
+    summary.textContent = `${reviewed.repositories.length} source-backed repository warnings. ${history.observations.length} recent local observations.`;
+    container.append(summary);
+    for (const item of reviewed.reviews || []) {
+      const card = document.createElement('article');
+      card.className = 'campaign';
+      card.dataset.status = 'UNKNOWN';
+      const title = document.createElement('h3');
+      title.textContent = `UNKNOWN · ${item.repository}`;
+      const note = document.createElement('p');
+      note.textContent = item.observations.join('. ') + '. ' + item.limits;
+      const link = document.createElement('a');
+      link.textContent = 'Inspect the recorded commit';
+      link.href = item.evidence_url;
+      link.rel = 'noreferrer';
+      card.append(title, note, link);
+      container.append(card);
+    }
+    for (const item of reviewed.repositories) {
+      const card = document.createElement('article');
+      card.className = 'campaign';
+      card.dataset.status = 'FAIL';
+      const title = document.createElement('h3');
+      title.textContent = `FAIL · ${item.repository}`;
+      const note = document.createElement('p');
+      note.textContent = `${item.campaign} · ${item.source_name} · ${item.published}`;
+      const link = document.createElement('a');
+      link.textContent = 'Read the evidence';
+      link.href = item.source_url;
+      link.rel = 'noreferrer';
+      card.append(title, note, link);
+      container.append(card);
+    }
+    for (const item of history.observations.slice(0, 10)) {
+      const row = document.createElement('p');
+      row.textContent = `${item.status} · ${item.target} · ${item.recorded_at}`;
+      container.append(row);
+    }
+  } catch (error) { renderError(container, error.message); }
+  filterRecords();
+}
+
+function filterRecords() {
+  const text = document.querySelector('#record-filter').value.toLowerCase();
+  const status = document.querySelector('#record-status').value;
+  for (const card of document.querySelectorAll('#reviewed article')) {
+    card.hidden = !card.textContent.toLowerCase().includes(text) || (status !== 'ALL' && card.dataset.status !== status);
+  }
+}
+document.querySelector('#record-filter').addEventListener('input', filterRecords);
+document.querySelector('#record-status').addEventListener('change', filterRecords);
+loadReviewed();
 

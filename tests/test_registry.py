@@ -10,7 +10,8 @@ from emuwatch.registry import validate_registry
 
 class RegistryTests(unittest.TestCase):
     def test_project_registry_is_valid(self):
-        directory = Path(__file__).resolve().parents[1] / "advisories"
+        from emuwatch.data import advisory_directory
+        directory = advisory_directory()
         self.assertEqual(validate_registry(directory), [])
 
     def test_invalid_hash_is_rejected(self):

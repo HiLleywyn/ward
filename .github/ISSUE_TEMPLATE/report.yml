@@ -1,0 +1,37 @@
+name: Report a suspicious download
+description: Submit a lead for review and keep a permanent evidence trail.
+title: "[Report] "
+labels: ["needs-review"]
+body:
+  - type: markdown
+    attributes:
+      value: "Reports begin as UNKNOWN. Please provide links and hashes. Do not attach malware, passwords, cookies, tokens, or personal data."
+  - type: input
+    id: repository
+    attributes:
+      label: Repository
+      placeholder: owner/repository
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Commit, release tag, or asset ID
+  - type: input
+    id: sha256
+    attributes:
+      label: SHA-256, if known
+  - type: input
+    id: evidence
+    attributes:
+      label: Evidence URL
+      description: A vendor report or immutable source reference.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Describe what you observed, what you inferred, and what remains unknown.
+    validations:
+      required: true

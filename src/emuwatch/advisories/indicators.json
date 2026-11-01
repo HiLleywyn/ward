@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-01T00:00:00Z",
+  "indicators": [
+    {"sha256":"06d0d13a4ce73775cf94a4a4f2314490de1d5b9af12db8ba9b01cd14222a2756","status":"confirmed","first_seen":"2025-02-24","source_url":"https://securelist.com/gitvenom-campaign/115694/","campaign":"GitVenom","validation_notes":"Kaspersky reference hash for infected repository archive; publication date used, actual first appearance unknown."},
+    {"sha256":"bd44a831ecf463756e106668ac877c6b66a2c0b954d13d6f311800e75e9c6678","status":"confirmed","first_seen":"2025-02-24","source_url":"https://securelist.com/gitvenom-campaign/115694/","campaign":"GitVenom","validation_notes":"Kaspersky reference hash for infected repository archive; publication date used, actual first appearance unknown."},
+    {"sha256":"05b143fd7061bdd317bd42c373c5352bec351a44fa849ded58236013126d2963","status":"confirmed","first_seen":"2025-06-18","source_url":"https://research.checkpoint.com/2025/minecraft-mod-malware-stargazers/","campaign":"Minecraft Stargazers","validation_notes":"Check Point stage 1 JAR indicator; publication date, not original upload."},
+    {"sha256":"9ca41431df9445535b96a45529fce9f9a8b7f26c08ac8989a57787462da3342f","status":"confirmed","first_seen":"2025-06-18","source_url":"https://research.checkpoint.com/2025/minecraft-mod-malware-stargazers/","campaign":"Minecraft Stargazers","validation_notes":"Check Point stage 1 JAR indicator; publication date, not original upload."},
+    {"sha256":"c5936514e05e8b1327f0df393f4d311afd080e5467062151951e94bbd7519703","status":"confirmed","first_seen":"2025-06-18","source_url":"https://research.checkpoint.com/2025/minecraft-mod-malware-stargazers/","campaign":"Minecraft Stargazers","validation_notes":"Check Point stage 1 JAR indicator; publication date, not original upload."},
+    {"sha256":"9a678140ce41bdd8c02065908ee85935e8d01e2530069df42856a1d6c902bae1","status":"confirmed","first_seen":"2025-06-18","source_url":"https://research.checkpoint.com/2025/minecraft-mod-malware-stargazers/","campaign":"Minecraft Stargazers","validation_notes":"Check Point stage 1 JAR indicator; publication date, not original upload."}
+  ],
+  "notes": [
+    "No file hashes were published in the cited PS5 emulator campaign coverage.",
+    "The non-PS5 indicators above come from primary research; each record cites its source."
+  ]
+}

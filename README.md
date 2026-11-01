@@ -1,5 +1,15 @@
 # Emulator Safety Watch
 
+Public site: [ward.lley.cat](https://ward.lley.cat)
+
+[Reviewed results and status history](docs/RESULTS.md) records 25 repositories
+named by primary security research and six confirmed SHA-256 indicators.
+Community reports use the repository issue form and begin as UNKNOWN.
+
+The [November 1 investigation](docs/HUNT-2026-11-01.md) covers 125 indexed PS5
+repositories, two unresolved provenance leads, and current availability of
+historical campaign repositories.
+
 Emulator Safety Watch helps people check whether a GitHub download is coming
 from the project they intended to visit. It also compares local files against a
 small, evidence-backed malware hash registry.
@@ -85,22 +95,21 @@ emuwatch file C:\Users\you\Downloads\suspicious.zip
 ```
 
 The file stays on your machine. The tool calculates SHA-256 locally and checks
-it against `advisories/indicators.json`. A negative result only means the hash
+it against `src/emuwatch/advisories/indicators.json`. A negative result only means the hash
 is not currently in this small registry.
 
 The checker also recognizes a small set of project-release assets in
-`advisories/known-project-assets.json`. That can confirm where an exact file
+`src/emuwatch/advisories/known-project-assets.json`. That can confirm where an exact file
 came from, but it still does not guarantee that the file is safe.
 
 ## Current advisory status
 
-The initial campaign record is in `advisories/campaigns.json`. It contains no
-repo URLs or hashes because none were published by the sources we found. We
-will only add a specific indicator when it has a primary source, reproducible
-analysis, or direct confirmation from a responsible security team.
+The initial PS5 campaign record is in `src/emuwatch/advisories/campaigns.json`.
+It has no confirmed PS5 repository or hash indicators. Separate Minecraft,
+Webrat, GitVenom, and Yoba records have primary research behind their indicators.
 
 Known project locations are listed separately in
-`advisories/project-locations.json`. They are identity anchors, not blanket
+`src/emuwatch/advisories/project-locations.json`. They are identity anchors, not blanket
 safety guarantees.
 
 ## If you already ran a suspicious emulator
@@ -144,4 +153,19 @@ dual-use security research.
 
 MIT. The advisory data is offered for defensive use and may contain incomplete
 information. Always verify current project guidance before running software.
+
+## Result history and privacy
+
+Each CLI check appends an observation to a local SQLite database. Community
+reports can be recorded with `emuwatch report`, and `emuwatch history` displays
+the audit trail. UNKNOWN means review is needed; FAIL means a confirmed exact
+indicator or a repository named in primary research. PASS applies only to a
+specific reviewed claim and never means a program is guaranteed safe.
+
+Public mode hides local history and file paths. File hashes stay in your
+browser. Public GitHub checks are cached for 15 minutes and globally capped at
+eight fresh checks per hour to fit the unauthenticated API allowance. Confirmed
+repository warnings and local file hashing keep working during cooldown.
+
+Maintained by Lleywyn. No analytics or advertising scripts are included.
 

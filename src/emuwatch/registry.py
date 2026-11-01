@@ -45,6 +45,20 @@ def validate_registry(directory: Path) -> list[RegistryProblem]:
     known_assets = _load(directory / "known-project-assets.json", problems)
     projects = _load(directory / "project-locations.json", problems)
     campaigns = _load(directory / "campaigns.json", problems)
+    repository_file = directory / "repositories.json"
+    if repository_file.exists():
+        repositories = _load(repository_file, problems)
+        seen = set()
+        for index, item in enumerate(repositories.get("repositories", [])):
+            key = str(item.get("repository", "")).lower()
+            source = repositories.get("sources", {}).get(item.get("source"))
+            if key in seen:
+                problems.append(RegistryProblem(repository_file.name, str(index), "duplicate repository"))
+            seen.add(key)
+            if not key or item.get("status") not in {"PASS", "FAIL", "UNKNOWN", "DISPUTED", "WITHDRAWN"}:
+                problems.append(RegistryProblem(repository_file.name, str(index), "invalid repository status"))
+            if not source or not _https(source.get("source_url")):
+                problems.append(RegistryProblem(repository_file.name, str(index), "primary source required"))
 
     seen_hashes: set[str] = set()
     for index, item in enumerate(indicators.get("indicators", [])):
@@ -58,6 +72,8 @@ def validate_registry(directory: Path) -> list[RegistryProblem]:
         for field in ("source_url", "first_seen", "status", "validation_notes"):
             if not item.get(field):
                 problems.append(RegistryProblem("indicators.json", location + f".{field}", "required"))
+        if item.get("status") not in {"confirmed", "suspected", "disputed", "false-positive", "removed"}:
+            problems.append(RegistryProblem("indicators.json", location + ".status", "invalid status"))
         if item.get("source_url") and not _https(item["source_url"]):
             problems.append(RegistryProblem("indicators.json", location + ".source_url", "must be HTTPS"))
 

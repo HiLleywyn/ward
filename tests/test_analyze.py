@@ -55,6 +55,17 @@ class ParseTargetTests(unittest.TestCase):
 
 
 class RepositoryAssessmentTests(unittest.TestCase):
+    def test_negative_antivirus_guidance_is_not_a_bypass_instruction(self):
+        result = assess_repository(snapshot('person/guide', readme='Never disable antivirus or Defender.'), NOW)
+        self.assertFalse(any(s.key == 'antivirus_bypass_instruction' for s in result.signals))
+
+    def test_tiny_source_large_release_and_profile_name(self):
+        from dataclasses import replace
+        snap = snapshot('KytyPS5-lookalike/.github', releases=[{'assets':[{'name':'build.zip','size':20_000_000}]}])
+        snap = replace(snap, tree_summary={'source_count':0,'source_bytes':0,'truncated':False})
+        result = assess_repository(snap, NOW)
+        self.assertTrue(any(s.key == 'little_source_large_release' for s in result.signals))
+
     def test_registry_location_is_not_penalized_for_name(self):
         result = assess_repository(
             snapshot("boykopovar/AnyPS5", created_at="2026-08-03T21:30:25Z"), NOW
@@ -100,7 +111,7 @@ class FileAssessmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "fixture.bin"
             path.write_bytes(payload)
-            result = assess_file(path, {"indicators": [{"sha256": sha256}]})
+            result = assess_file(path, {"indicators": [{"sha256": sha256, "status": "confirmed"}]})
         self.assertTrue(result.exact_indicator_match)
         self.assertEqual(result.verdict, "confirmed-malicious-indicator")
 
