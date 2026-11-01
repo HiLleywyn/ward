@@ -154,7 +154,8 @@ def _external_download_hosts(readme: str) -> list[str]:
 
 
 def assess_repository(
-    snapshot: RepositorySnapshot, now: datetime | None = None
+    snapshot: RepositorySnapshot, now: datetime | None = None,
+    indicators: dict[str, Any] | None = None,
 ) -> Assessment:
     now = now or datetime.now(timezone.utc)
     repo = snapshot.repository
@@ -251,6 +252,23 @@ def assess_repository(
         )
 
     assets = [asset for release in snapshot.releases for asset in release.get("assets", [])]
+    digests = {str(asset.get("digest", "")).lower() for asset in assets}
+    if any(digest.startswith("sha256:") for digest in digests):
+        if indicators is None:
+            from .data import advisory_directory
+            indicators = load_indicators(advisory_directory() / "indicators.json")
+        matches = [item for item in indicators.get("indicators", [])
+            if item.get("status") == "confirmed" and "sha256:" + item.get("sha256", "").lower() in digests]
+        if matches:
+            return Assessment(
+                target=full_name, verdict="confirmed-malicious-asset", score=100,
+                exact_indicator_match=True, canonical_project=project["name"] if project else None,
+                signals=[Signal("confirmed_release_digest", 100,
+                    "GitHub reports a release asset SHA-256 matching a confirmed malicious-file indicator.")],
+                limitations=[f"Evidence: {item['source_url']}" for item in matches] + [
+                    "The comparison uses GitHub's asset digest metadata. The asset was not downloaded or executed.",
+                    "Only the matching asset is identified by this hash; other assets and repository contributors were not assessed."],
+            )
     executable_assets = [
         asset for asset in assets if Path(asset.get("name", "")).suffix.lower() in EXECUTABLE_SUFFIXES
     ]

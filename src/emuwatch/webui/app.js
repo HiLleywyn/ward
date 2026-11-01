@@ -7,7 +7,7 @@ const fileResult = document.querySelector("#file-result");
 const dropZone = document.querySelector("#drop-zone");
 
 function resultClass(verdict) {
-  if (["confirmed-malicious-indicator", "reported-malicious-repository", "high-risk-metadata"].includes(verdict)) return "danger";
+  if (["confirmed-malicious-indicator", "confirmed-malicious-asset", "reported-malicious-repository", "high-risk-metadata"].includes(verdict)) return "danger";
   if (["needs-review", "caution"].includes(verdict)) return "caution";
   return verdict === "known-project-artifact" ? "good" : "unknown";
 }
@@ -15,6 +15,7 @@ function resultClass(verdict) {
 function verdictTitle(verdict) {
   const titles = {
     "confirmed-malicious-indicator": "Exact known-malware match",
+    "confirmed-malicious-asset": "Release matches a known malicious file",
     "reported-malicious-repository": "Named in a primary malware report",
     "high-risk-metadata": "Stop and verify this one",
     "needs-review": "This needs a closer look",

@@ -2,11 +2,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from emuwatch.analyze import assess_file, parse_repository_target
+from emuwatch.analyze import assess_file, assess_repository, parse_repository_target
 from emuwatch.evidence import ResultStore, repository_warning
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_renamed_repo_with_known_asset_digest_is_detected(self):
+        from emuwatch.github import RepositorySnapshot
+        digest = 'a' * 64
+        snapshot = RepositorySnapshot(
+            {'full_name':'unrelated/tool','name':'tool','size':1000}, {},
+            [{'assets':[{'name':'tool.zip','digest':'sha256:'+digest}]}], '')
+        indicators = {'indicators':[{'sha256':digest,'status':'confirmed','source_url':'https://example.test/report'}]}
+        result = assess_repository(snapshot, indicators=indicators)
+        self.assertTrue(result.exact_indicator_match)
+        self.assertEqual(result.verdict,'confirmed-malicious-asset')
+        indicators['indicators'][0]['status'] = 'false-positive'
+        self.assertFalse(assess_repository(snapshot, indicators=indicators).exact_indicator_match)
+
     def test_primary_repository_warning_works_without_network(self):
         result = repository_warning('https://github.com/A1phaD3v/Oringo-Client/releases/tag/test')
         self.assertTrue(result.exact_indicator_match)
