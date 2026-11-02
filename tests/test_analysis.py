@@ -135,8 +135,8 @@ class WindowsPolicyTests(unittest.TestCase):
         self.assertIn("Invoke-CimMethod -ClassName Win32_Process", guest)
         self.assertIn("-OperationTimeoutSec 20", guest)
         self.assertIn("-OperationTimeoutSec 10", guest)
-        self.assertIn("$values.Count -lt 2000", guest)
-        self.assertIn("[IO.FileAttributes]::ReparsePoint", guest)
+        self.assertIn("Select-Object -First 500", guest)
+        self.assertNotIn("-Recurse", guest)
         self.assertIn("executed=$executed", guest)
 
     def test_only_explicit_sandbox_identifiers_are_used_for_teardown(self):

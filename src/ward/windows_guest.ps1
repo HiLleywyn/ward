@@ -11,23 +11,15 @@ if ($digest -ne $request.sha256) { throw 'Artifact digest mismatch inside Window
 
 function Get-ProfileFiles {
     $values = @{}
-    $queue = New-Object 'System.Collections.Generic.Queue[string]'
-    foreach ($candidate in @($env:USERPROFILE, 'C:\Users\WDAGUtilityAccount') | Select-Object -Unique) {
-        if (Test-Path -LiteralPath $candidate -PathType Container) { $queue.Enqueue($candidate) }
-    }
-    $deadline = (Get-Date).AddSeconds(15)
-    while ($queue.Count -gt 0 -and $values.Count -lt 2000 -and (Get-Date) -lt $deadline) {
-        $directory = $queue.Dequeue()
-        foreach ($item in @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction SilentlyContinue)) {
-            if ($item.PSIsContainer) {
-                if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) {
-                    $queue.Enqueue($item.FullName)
-                }
-            } else {
-                $values[$item.FullName] = "$($item.Length):$($item.LastWriteTimeUtc.Ticks)"
-                if ($values.Count -ge 2000) { break }
-            }
+    $roots = @($env:TEMP, $env:APPDATA, $env:LOCALAPPDATA, 'C:\ProgramData') | Select-Object -Unique
+    foreach ($directory in $roots) {
+        if (-not (Test-Path -LiteralPath $directory -PathType Container)) { continue }
+        foreach ($item in @(Get-ChildItem -LiteralPath $directory -File -Force -ErrorAction SilentlyContinue |
+                Select-Object -First 500)) {
+            $values[$item.FullName] = "$($item.Length):$($item.LastWriteTimeUtc.Ticks)"
+            if ($values.Count -ge 2000) { break }
         }
+        if ($values.Count -ge 2000) { break }
     }
     return $values
 }
