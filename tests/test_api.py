@@ -219,6 +219,11 @@ class WardAPITests(unittest.TestCase):
             badge = response.read().decode()
             self.assertEqual(response.headers.get_content_type(), "image/svg+xml")
         self.assertIn("malware detected", badge)
+        generic_target = "https%3A%2F%2Fgithub.com%2Fowner%2Frepo.git"
+        with urlopen(self.base + f"/api/v1/badge.svg?repository={generic_target}&branch=feature") as response:
+            self.assertIn("malware detected", response.read().decode())
+        with urlopen(self.base + f"/repository?target={generic_target}") as response:
+            self.assertIn("Repository Ledger", response.read().decode())
         with urlopen(self.base + f"/scans/{scan_ids[1]}") as response:
             record_page = response.read().decode()
         self.assertIn("Evidence digest", record_page)

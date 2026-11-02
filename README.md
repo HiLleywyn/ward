@@ -1,6 +1,7 @@
 # Ward
 
 [![Ward](https://ward.lley.cat/api/v1/badges/HiLleywyn/ward.svg?branch=main)](https://ward.lley.cat/repositories/HiLleywyn/ward)
+[![Ward git.lley mirror](https://ward.lley.cat/api/v1/badge.svg?repository=https%3A%2F%2Fgit.lley.cat%2Fr%2Fb60252cb-df6f-478f-8cb7-d18f4cdd316b.git&branch=main)](https://ward.lley.cat/repository?target=https%3A%2F%2Fgit.lley.cat%2Fr%2Fb60252cb-df6f-478f-8cb7-d18f4cdd316b.git)
 
 Public site: [ward.lley.cat](https://ward.lley.cat)
 
@@ -64,8 +65,8 @@ read access to public repositories.
 ## Check a GitHub repository
 
 ```powershell
-emuwatch repo https://github.com/OWNER/REPOSITORY
-emuwatch repo OWNER/REPOSITORY --json
+ward repo https://github.com/OWNER/REPOSITORY
+ward repo OWNER/REPOSITORY --json
 ```
 
 The checker reads repository metadata, public account metadata, release asset
@@ -74,7 +75,7 @@ names and sizes, and README text. It does not request release asset contents.
 ## Use the repository scanner
 
 ```powershell
-emuwatch web
+ward web
 ```
 
 This opens a local interface at `http://127.0.0.1:8787`. Paste a GitHub shorthand,
@@ -89,8 +90,8 @@ available through the CLI below, where the file stays on your machine.
 ## Hunt for rotating lookalikes
 
 ```powershell
-emuwatch hunt anyps5 --limit 20
-emuwatch hunt kytyps5 --limit 50 --min-score 45 --json
+ward hunt anyps5 --limit 20
+ward hunt kytyps5 --limit 50 --min-score 45 --json
 ```
 
 Hunt mode searches GitHub by known project names, then applies bounded
@@ -101,7 +102,7 @@ validated before an indicator is published or a platform report is sent.
 ## Validate the registry
 
 ```powershell
-emuwatch validate
+ward validate
 ```
 
 Validation checks required fields, HTTPS evidence links, SHA-256 formatting,
@@ -110,7 +111,7 @@ and duplicate records before advisory data is published.
 ## Check a downloaded file
 
 ```powershell
-emuwatch file C:\Users\you\Downloads\suspicious.zip
+ward file C:\Users\you\Downloads\suspicious.zip
 ```
 
 The file stays on your machine. The tool calculates SHA-256 locally and checks
@@ -179,7 +180,7 @@ information. Always verify current project guidance before running software.
 ## Result history and privacy
 
 Each CLI check appends an observation to a local SQLite database. Community
-reports can be recorded with `emuwatch report`, and `emuwatch history` displays
+reports can be recorded with `ward report`, and `ward history` displays
 the audit trail. UNKNOWN means review is needed; FAIL means a confirmed exact
 indicator or a repository named in primary research. PASS applies only to a
 specific reviewed claim and never means a program is guaranteed safe.
@@ -187,9 +188,12 @@ specific reviewed claim and never means a program is guaranteed safe.
 Public mode hides legacy local history and local file paths. Repository scan
 records are intentionally public and contain repository paths, commit IDs,
 findings, hashes that matched known indicators, and scan limits. The scanner is
-globally capped at six clone attempts per hour and one active clone at a time.
+globally capped at 120 scan requests per hour, with a 12-per-client hourly cap
+and one repository worker at a time.
 The legacy GitHub metadata endpoint is cached for 15 minutes and capped at eight
 fresh checks per hour. Local file hashing remains CLI-only.
 
 Maintained by Lleywyn. No analytics or advertising scripts are included.
+
+`emuwatch` remains available as a legacy command alias for existing scripts.
 

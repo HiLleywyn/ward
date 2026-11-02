@@ -13,6 +13,7 @@ authors = [{ name = "HiLleywyn" }]
 dependencies = []
 
 [project.scripts]
+ward = "emuwatch.cli:main"
 emuwatch = "emuwatch.cli:main"
 
 [tool.setuptools]

@@ -30,8 +30,8 @@ Community leads can be filed through the repository's issue form once hosted,
 or locally with:
 
 ```powershell
-emuwatch report OWNER/REPO --evidence https://example.org/report --description "Observed behavior"
-emuwatch history
+ward report OWNER/REPO --evidence https://example.org/report --description "Observed behavior"
+ward history
 ```
 
 Reports cannot assign their own confirmed status. Corrections to reviewed data

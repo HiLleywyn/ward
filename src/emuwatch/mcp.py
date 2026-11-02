@@ -35,7 +35,7 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "repository": {"type": "string", "pattern": "^[^/]+/[^/]+$"},
+                "repository": {"type": "string", "minLength": 1, "maxLength": 500},
                 "branch": {"type": "string", "maxLength": 200}
             },
             "required": ["repository"],
@@ -142,17 +142,22 @@ def _call_tool(
         return _tool_result(job)
     if name == "ward_get_badge":
         repository = str(arguments.get("repository", "")).strip()
-        if len(repository.split("/")) != 2:
-            raise APIError(422, "invalid_repository", "repository must use owner/repository")
+        if not repository:
+            raise APIError(422, "invalid_repository", "repository is required")
         branch = str(arguments.get("branch", "")).strip() or None
         try:
             job = store.latest_repository_scan(repository, branch)
         except ValueError as exc:
             raise APIError(422, "invalid_repository", str(exc)) from exc
-        badge_url = f"https://ward.lley.cat/api/v1/badges/{quote(repository, safe='/')}.svg"
+        if "://" not in repository and len(repository.split("/")) == 2:
+            badge_url = f"https://ward.lley.cat/api/v1/badges/{quote(repository, safe='/')}.svg"
+            ledger_url = "https://ward.lley.cat/repositories/" + quote(repository, safe="/")
+        else:
+            encoded = quote(repository, safe="")
+            badge_url = "https://ward.lley.cat/api/v1/badge.svg?repository=" + encoded
+            ledger_url = "https://ward.lley.cat/repository?target=" + encoded
         if branch:
-            badge_url += "?branch=" + quote(branch, safe="")
-        ledger_url = "https://ward.lley.cat/repositories/" + quote(repository, safe="/")
+            badge_url += ("&" if "?" in badge_url else "?") + "branch=" + quote(branch, safe="")
         return _tool_result({
             "repository": repository,
             "branch": branch,

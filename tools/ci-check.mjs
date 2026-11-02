@@ -54,6 +54,9 @@ check('package version is consistent', () => {
   const project = read('pyproject.toml').match(/^version = "([^"]+)"/m)?.[1];
   const module = read('src/emuwatch/__init__.py').match(/^__version__ = "([^"]+)"/m)?.[1];
   assert(project && module && project === module, 'pyproject.toml and emuwatch.__version__ differ');
+  const packaging = read('pyproject.toml');
+  assert(packaging.includes('ward = "emuwatch.cli:main"'), 'Ward CLI entry point is missing');
+  assert(packaging.includes('emuwatch = "emuwatch.cli:main"'), 'Legacy emuwatch CLI alias is missing');
 });
 
 check('advisory JSON is valid', () => {
@@ -117,6 +120,7 @@ check('OpenAPI contract covers implemented resources', () => {
     '/api/v1/repositories/history', '/api/v1/comparisons', '/api/v1/malware-records',
     '/api/v1/artifacts/{sha256}', '/api/v1/reports/{scan_id}',
     '/api/v1/badges/{owner}/{repository}.svg', '/mcp',
+    '/api/v1/badge.svg',
   ]) {
     assert(document.paths[route], `OpenAPI route is missing: ${route}`);
   }

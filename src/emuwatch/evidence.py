@@ -382,8 +382,10 @@ class ResultStore:
 
     def latest_repository_scan(self, target: str, branch: str | None = None) -> dict | None:
         keys = self._repository_keys(target)
-        if not keys:
+        if not keys or len(target) > 500:
             raise ValueError("Repository target is required")
+        if branch and len(branch) > 200:
+            raise ValueError("Repository branch is too long")
         with self.connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM scan_jobs WHERE kind = 'repository' ORDER BY rowid DESC"

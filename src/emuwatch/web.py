@@ -268,6 +268,20 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 self._send_json({"error": "Invalid host"}, HTTPStatus.BAD_REQUEST)
                 return
             request = urlsplit(self.path)
+            if request.path == "/api/v1/badge.svg":
+                query = parse_qs(request.query)
+                repository = query.get("repository", [""])[0]
+                branch = query.get("branch", [None])[0]
+                if not repository:
+                    self._api_error(APIError(400, "invalid_repository", "repository query parameter is required"))
+                    return
+                try:
+                    job = store.latest_repository_scan(repository, branch)
+                except ValueError as exc:
+                    self._api_error(APIError(400, "invalid_repository", str(exc)))
+                    return
+                self._send_bytes(badge_svg(job), "image/svg+xml; charset=utf-8")
+                return
             if request.path.startswith("/api/v1/badges/") and request.path.endswith(".svg"):
                 repository = unquote(request.path.removeprefix("/api/v1/badges/").removesuffix(".svg"))
                 if len([part for part in repository.split("/") if part]) != 2:
@@ -303,6 +317,15 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                     self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
                     return
                 self._send_bytes(repository_ledger_page(store.repository_history(repository)), "text/html; charset=utf-8")
+                return
+            if request.path == "/repository":
+                target = parse_qs(request.query).get("target", [""])[0]
+                try:
+                    history = store.repository_history(target)
+                except ValueError:
+                    self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_bytes(repository_ledger_page(history), "text/html; charset=utf-8")
                 return
             if request.path == "/mcp":
                 self._send_json({"error": {

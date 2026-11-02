@@ -41,3 +41,15 @@ The step summary contains the exact scan record and copyable badge Markdown. A b
 `Inspected` is not a promise that software is safe. The linked record identifies the exact commit, checks, limits, evidence digest, and findings. Ward reserves `verified` for a future isolated build and behavioral-analysis tier. That tier will not be issued until it runs outside the web-service host in a disposable sandbox boundary.
 
 GitHub may cache badge images briefly. The exact workflow result and scan record remain authoritative.
+
+## git.lley.cat and other Git hosts
+
+The action script accepts any public HTTPS Git URL. Non-GitHub badges use the generic endpoint:
+
+```markdown
+[![Ward](https://ward.lley.cat/api/v1/badge.svg?repository=ENCODED_HTTPS_GIT_URL&branch=main)](https://ward.lley.cat/repository?target=ENCODED_HTTPS_GIT_URL)
+```
+
+This Markdown can be placed in a git.lley.cat README. A CI runner can invoke `.github/actions/ward/ward_scan.py` with the documented `WARD_*` environment variables even when it is not running on GitHub.
+
+Ward can clone public git.lley.cat repositories immediately. Private repositories are not supported by anonymous scanning. Ward does not retain or use a git.lley.cat owner token; private scanning requires a future scoped upload capability and explicit retention policy.

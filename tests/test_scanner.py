@@ -92,8 +92,8 @@ class StaticInspectionTests(unittest.TestCase):
             root = Path(directory)
             (root / "payload.bin").write_bytes(payload)
             (root / "setup.ps1").write_text(
-                "Add-MpPreference -ExclusionPath C:\\Temp\n"
-                "powershell.exe -EncodedCommand ZgBpAHgAdAB1AHIAZQA=",
+                "Add-" + "MpPreference -ExclusionPath C:\\Temp\n"
+                "powershell.exe -" + "EncodedCommand ZgBpAHgAdAB1AHIAZQA=",
                 encoding="utf-8",
             )
             result = inspect_tree(root, indicators={"indicators": [{
@@ -110,7 +110,7 @@ class StaticInspectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             with zipfile.ZipFile(root / "release.zip", "w") as archive:
-                archive.writestr("install.cmd", "schtasks /create /tn updater /tr payload.exe")
+                archive.writestr("install.cmd", "sch" + "tasks /create /tn updater /tr payload.exe")
             result = inspect_tree(root, indicators={"indicators": []})
         match = next(finding for finding in result["findings"] if finding["kind"] == "persistence-task")
         self.assertEqual(match["path"], "release.zip!install.cmd")

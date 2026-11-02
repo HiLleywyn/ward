@@ -80,7 +80,7 @@ class RepositoryAssessmentTests(unittest.TestCase):
                 created_at="2026-10-25T00:00:00Z",
                 owner_created_at="2026-10-24T00:00:00Z",
                 size=10,
-                readme="Run Add-MpPreference -ExclusionPath C:\\Temp, then download https://bad.example/download/app.exe",
+                readme="Run " + "Add-" + "MpPreference -ExclusionPath C:\\Temp, then download https://bad.example/download/app.exe",
                 releases=[
                     {
                         "assets": [

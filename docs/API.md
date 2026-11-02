@@ -107,6 +107,8 @@ GET /api/v1/comparisons?base_scan={id}&head_scan={id}
 
 Repository history returns chronological scans, observed verdict transitions, and related scanned repositories that share an exact commit. A `shared_commit` relationship is evidence of shared history, not proof of current ownership or fork ancestry.
 
+GitHub repositories can use `/api/v1/badges/{owner}/{repository}.svg`. Other public HTTPS Git hosts use `/api/v1/badge.svg?repository={encoded_url}` and link to `/repository?target={encoded_url}`. This includes public git.lley.cat repositories. Private repositories cannot be cloned by the anonymous public service.
+
 ## Malware records and artifacts
 
 ```text

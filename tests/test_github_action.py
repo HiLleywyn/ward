@@ -85,9 +85,30 @@ class WardGitHubActionTests(unittest.TestCase):
             with patch.object(ward_action, "request_json", side_effect=responses):
                 self.assertEqual(ward_action.main(), 1)
 
-    def test_badge_repository_must_be_github_owner_and_name(self):
-        with self.assertRaises(RuntimeError):
-            ward_action.repository_name("https://git.example/team/group/repo.git")
+    def test_generic_git_badge_uses_encoded_repository_url(self):
+        badge, ledger = ward_action.badge_locations(
+            "https://ward.example", "https://git.lley.cat/r/repository-id.git", "main"
+        )
+        self.assertIn("/api/v1/badge.svg?repository=https%3A%2F%2Fgit.lley.cat", badge)
+        self.assertIn("&branch=main", badge)
+        self.assertIn("/repository?target=https%3A%2F%2Fgit.lley.cat", ledger)
+
+    def test_findings_fail_even_when_static_inspection_completed(self):
+        environment = {
+            "WARD_REPOSITORY_URL": "https://github.com/owner/repo",
+            "WARD_EXPECTED_COMMIT": "c" * 40,
+        }
+        responses = [
+            {"id": "scan-4", "status": "completed", "links": {"self": "/api/v1/scans/scan-4"}},
+            {
+                "verdict": {"status": "unknown"},
+                "evidence": {"verification": {"level": "inspected"}},
+                "engines": [{"detections": [{"title": "Review me"}]}],
+            },
+        ]
+        with patch.dict(os.environ, environment, clear=True):
+            with patch.object(ward_action, "request_json", side_effect=responses):
+                self.assertEqual(ward_action.main(), 1)
 
 
 if __name__ == "__main__":

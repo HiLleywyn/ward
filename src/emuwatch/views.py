@@ -16,6 +16,8 @@ def badge_state(job: dict | None) -> tuple[str, str, str]:
         return "✕", "malware detected", "#c94f4f"
     if verdict == "Corroborated":
         return "!", "suspicious", "#c47b3a"
+    if job["result"].get("findings"):
+        return "!", "review findings", "#c47b3a"
     level = (job["result"].get("verification") or {}).get("level")
     if level == "verified":
         return "✓", "verified", "#c9a64f"

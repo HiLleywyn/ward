@@ -34,12 +34,21 @@ def request_json(url: str, *, payload: dict | None = None, headers: dict[str, st
         raise RuntimeError(f"Ward could not be reached: {exc.reason}") from exc
 
 
-def repository_name(url: str) -> str:
+def badge_locations(base_url: str, url: str, ref: str) -> tuple[str, str]:
     parsed = urlparse(url)
     parts = [part for part in parsed.path.removesuffix(".git").split("/") if part]
-    if parsed.hostname != "github.com" or len(parts) != 2:
-        raise RuntimeError("README badges currently require a github.com owner/repository URL")
-    return "/".join(parts)
+    if parsed.hostname == "github.com" and len(parts) == 2:
+        repository = "/".join(parts)
+        badge_url = f"{base_url}/api/v1/badges/{repository}.svg"
+        ledger_url = f"{base_url}/repositories/{repository}"
+    else:
+        encoded = quote(url, safe="")
+        badge_url = f"{base_url}/api/v1/badge.svg?repository={encoded}"
+        ledger_url = f"{base_url}/repository?target={encoded}"
+    if ref:
+        separator = "&" if "?" in badge_url else "?"
+        badge_url += f"{separator}branch={quote(ref, safe='')}"
+    return badge_url, ledger_url
 
 
 def set_output(name: str, value: str) -> None:
@@ -82,11 +91,7 @@ def main() -> int:
     record_url = f"{base_url}/scans/{scan_id}"
     report = request_json(f"{base_url}/api/v1/reports/{scan_id}")
     verdict = report["verdict"]["status"]
-    repository = repository_name(repository_url)
-    badge_url = f"{base_url}/api/v1/badges/{repository}.svg"
-    if ref:
-        badge_url += f"?branch={quote(ref, safe='')}"
-    ledger_url = f"{base_url}/repositories/{repository}"
+    badge_url, ledger_url = badge_locations(base_url, repository_url, ref)
     badge = f"[![Ward]({badge_url})]({ledger_url})"
     verification = report.get("evidence", {}).get("verification", {}).get("level", "not recorded")
     findings = sum(len(engine.get("detections", [])) for engine in report.get("engines", []))
@@ -107,7 +112,7 @@ def main() -> int:
         ))
     )
     print(f"Ward {verdict}: {record_url}")
-    passed = verdict == "unknown" and verification in {"inspected", "verified"}
+    passed = verdict == "unknown" and verification in {"inspected", "verified"} and findings == 0
     return 0 if passed else 1
 
 
