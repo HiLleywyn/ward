@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import ProxyHandler, Request, build_opener
+from urllib.parse import urlencode
 
 from ward.api import openapi_document
 from ward.evidence import ResultStore
@@ -274,6 +275,42 @@ class WardAPITests(unittest.TestCase):
         with urlopen(self.base + "/repositories/owner/repo") as response:
             ledger_page = response.read().decode()
         self.assertIn("Observed Changes", ledger_page)
+
+    def test_ward_scan_link_opens_latest_persisted_record_without_scanning(self):
+        repository = "CarrierForge/Fishing-Planet-Cheat"
+        store = ResultStore(Path(self.temp.name) / "results.sqlite3")
+        with patch("ward.web.GitHubClient.snapshot", side_effect=AssertionError("Record links must never scan")):
+            path = "/repository?" + urlencode({"target": repository, "latest": "1"})
+            with urlopen(self.base + path, timeout=3) as response:
+                self.assertIn("No scans recorded.", response.read().decode())
+            self.assertIsNone(store.latest_repository_scan(repository))
+            scan_ids = []
+            for index in range(2):
+                job, _ = store.create_scan_job(
+                    kind="repository", target=f"https://github.com/{repository}.git",
+                    request_hash=str(index) * 64, idempotency_key=None, cancel_token_hash="a" * 64,
+                )
+                store.start_scan_job(job["id"])
+                store.complete_scan_job(job["id"], {
+                    "repository": repository, "status": "Unverified", "findings": [], "commit": str(index) * 40,
+                    "verification": {"level": "inspected"},
+                })
+                scan_ids.append(job["id"])
+            with urlopen(self.base + path, timeout=3) as response:
+                self.assertEqual(response.url, self.base + f"/scans/{scan_ids[-1]}")
+                page = response.read().decode()
+            self.assertIn(f'href="/api/v1/reports/{scan_ids[-1]}"', page)
+            self.assertIn('href="/api/record?repository=CarrierForge%2FFishing-Planet-Cheat"', page)
+            self.assertIn('<script src="/evidence.js"></script>', page)
+            with urlopen(self.base + "/evidence.js", timeout=3) as response:
+                self.assertEqual(response.headers.get_content_type(), "text/javascript")
+                self.assertIn("function evidenceText", response.read().decode())
+            self.assertIn("This does not prove safety", page)
+            with urlopen(self.base + "/repository?" + urlencode({"target": "https://codeberg.org/owner/repo.git", "latest": "1"}), timeout=3) as response:
+                self.assertIn("No scans recorded.", response.read().decode())
+            with self.assertRaises(HTTPError) as invalid:
+                urlopen(self.base + "/repository?latest=1", timeout=3)
+            self.assertEqual(invalid.exception.code, 404)
 
 
 class ScanJobStoreTests(unittest.TestCase):

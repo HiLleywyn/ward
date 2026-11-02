@@ -45,10 +45,10 @@ function escapeXml(value) {
 }
 
 check('browser JavaScript parses', () => {
-  const result = spawnSync(process.execPath, ['--check', path.join(root, 'src', 'ward', 'webui', 'app.js')], {
-    encoding: 'utf8',
-  });
-  assert(result.status === 0, result.stderr.trim() || 'node --check failed');
+  for (const file of ['app.js', 'evidence.js']) {
+    const result = spawnSync(process.execPath, ['--check', path.join(root, 'src', 'ward', 'webui', file)], {encoding: 'utf8'});
+    assert(result.status === 0, result.stderr.trim() || `node --check failed: ${file}`);
+  }
 });
 
 function evidenceRenderers() {
@@ -58,13 +58,15 @@ function evidenceRenderers() {
     get textContent() { return this.children.map(child => child.textContent).join(''); }
     set innerHTML(value) { throw new Error('Evidence must never be parsed as HTML'); }
     append(...children) { this.children.push(...children); }
+    setAttribute(name, value) { this[name] = value; }
   }
   const script = read('src/ward/webui/app.js');
-  const start = script.indexOf('function textElement(');
+  const start = script.indexOf('function familyGuidance(');
   const end = script.indexOf('function findingElement(');
   assert(start >= 0 && end > start, 'record rendering helpers are missing');
-  return vm.runInNewContext(`${script.slice(start, end)}\n({evidenceText, familyGuidance})`, {
-    document: {createElement: tag => new Element(tag), createTextNode: text => ({textContent: text})},
+  return vm.runInNewContext(`${read('src/ward/webui/evidence.js')}\n${script.slice(start, end)}\n({evidenceText, evidenceParagraphs, familyGuidance, externalScanLinks, recordActions})`, {
+    URL,
+    document: {createElement: tag => new Element(tag), createTextNode: text => ({textContent: text}), querySelectorAll: () => []},
   });
 }
 
@@ -82,6 +84,42 @@ check('evidence preserves text and safely formats technical values', () => {
   assert(result.children.every(child => !child.tagName || child.tagName === 'code'), 'untrusted text became markup');
   assert(evidenceText('p', '', 'Use `gpo_open` here.').textContent === 'Use gpo_open here.', 'explicit inline code is not supported');
   assert(evidenceText('p', '', 'Incomplete `markup').textContent === 'Incomplete `markup', 'incomplete markup lost text');
+});
+
+check('complete paths and URLs stay in a single code span', () => {
+  const {evidenceText, evidenceParagraphs} = evidenceRenderers();
+  const paths = ['encrypted/1.zip', '1/1.exe', '/encrypted/update.ps1', '/screen.php', 'https://git-software.cc/ps/Setup.ps1', 'C:\\Users\\Example\\payload.exe'];
+  for (const path of paths) {
+    const result = evidenceText('p', '', `Observed ${path}, then stopped.`);
+    const codes = result.children.filter(child => child.tagName === 'code');
+    assert(codes.length === 1 && codes[0].textContent === path, `path was fragmented: ${path}`);
+    assert(result.textContent === `Observed ${path}, then stopped.`, 'formatting changed source punctuation');
+  }
+  const result = evidenceParagraphs('First sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence.');
+  assert(result.children.filter(child => child.tagName === 'p').length === 3, 'dense findings were not split into paragraphs');
+  assert(result.children.filter(child => child.tagName === 'p').map(child => child.textContent).join(' ') === 'First sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence.', 'paragraph formatting changed evidence');
+});
+
+check('record links distinguish external scans from repositories and Ward evidence', () => {
+  const {externalScanLinks, recordActions} = evidenceRenderers();
+  const links = externalScanLinks([
+    {source_url: 'https://github.com/owner/malware/blob/main/README.md', malware_db_url: 'https://www.virustotal.com/gui/file/abc'},
+    {source_url: 'https://research.checkpoint.com/report', malware_db_url: 'https://www.virustotal.com/gui/file/abc'},
+    {source_url: 'https://ward.lley.cat/api/record', malware_db_url: 'https://ward.lley.cat/api/v1/artifacts/abc'},
+    {source_url: 'https://www.virustotal.com.attacker.test/file/abc', malware_db_url: 'https://user:secret@www.virustotal.com/gui/file/abc'},
+    {malware_db_url: 'https://threatfox.abuse.ch/ioc/123/'},
+    {malware_db_url: 'https://bazaar.abuse.ch/browse/signature/XMRig/'},
+  ]).children.filter(child => child.tagName === 'a');
+  assert(links.length === 3, 'non-scan links or duplicate external scans were displayed');
+  assert(links.every(link => link.textContent === 'External Scan'), 'external scan labels are inconsistent');
+  assert(links.map(link => link.title).join('|') === 'VirusTotal|ThreatFox|MalwareBazaar', 'external provider attribution was lost');
+  const actions = recordActions('/repository?target=owner%2Frepo&latest=1', 'https://github.com/owner/repo').children.filter(child => child.tagName === 'a');
+  assert(actions.map(link => link.textContent).join('|') === 'Ward Scan|Repository', 'child record labels are incorrect');
+  assert(actions[0].href === '/repository?target=owner%2Frepo&latest=1' && actions[1].href === 'https://github.com/owner/repo', 'record links target the wrong resources');
+  for (const invalid of ['javascript:alert(1)', 'https://user:secret@github.com/owner/repo', undefined]) {
+    assert(recordActions('/scans/fixture', invalid).children.filter(child => child.tagName === 'a').length === 1, 'unsafe repository link was accepted');
+  }
+  assert(!read('src/ward/webui/app.js').includes('Supporting research'), 'repository was labelled supporting research');
 });
 
 check('parent guidance deduplicates shared text and preserves scoped variants', () => {

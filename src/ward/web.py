@@ -290,7 +290,12 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                     report = report_for_job(job)
                 except APIError:
                     report = None
-                self._send_bytes(scan_record_page(job, report), "text/html; charset=utf-8")
+                target = (job.get("result") or {}).get("repository") or job["target"]
+                try:
+                    reviewed = malware_record(target) if job["kind"] == "repository" else None
+                except ValueError:
+                    reviewed = None
+                self._send_bytes(scan_record_page(job, report, reviewed), "text/html; charset=utf-8")
                 return
             if request.path.startswith("/repositories/"):
                 repository = unquote(request.path.removeprefix("/repositories/")).strip("/")
@@ -302,11 +307,20 @@ def _handler() -> type[BaseHTTPRequestHandler]:
             if request.path == "/repository":
                 target = parse_qs(request.query).get("target", [""])[0]
                 try:
+                    reviewed = malware_record(target)
+                except ValueError:
+                    reviewed = None
+                try:
+                    if parse_qs(request.query).get("latest") == ["1"]:
+                        job = store.latest_repository_scan(target)
+                        if job is not None:
+                            self._send_bytes(b"", "text/plain", HTTPStatus.FOUND, {"Location": f"/scans/{job['id']}"})
+                            return
                     history = store.repository_history(target)
                 except ValueError:
                     self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
                     return
-                self._send_bytes(repository_ledger_page(history), "text/html; charset=utf-8")
+                self._send_bytes(repository_ledger_page(history, reviewed), "text/html; charset=utf-8")
                 return
             if request.path == "/mcp":
                 self._send_json({"error": {
@@ -331,6 +345,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 "/developers.html": (WEB_ROOT / "developers.html", "text/html; charset=utf-8"),
                 "/styles.css": (WEB_ROOT / "styles.css", "text/css; charset=utf-8"),
                 "/app.js": (WEB_ROOT / "app.js", "text/javascript; charset=utf-8"),
+                "/evidence.js": (WEB_ROOT / "evidence.js", "text/javascript; charset=utf-8"),
                 "/developers.js": (WEB_ROOT / "developers.js", "text/javascript; charset=utf-8"),
             }
             if request.path == "/api/indicators":

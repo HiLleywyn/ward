@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+from urllib.parse import quote, urlencode
 
 from .analysis import analysis_assessment
 
@@ -57,10 +58,10 @@ def _page(title: str, body: str) -> bytes:
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="Ward malware scan evidence"><title>{html.escape(title)} · Ward</title><link rel="stylesheet" href="/styles.css"></head>
 <body><div class="grid" aria-hidden="true"></div><main class="record-page"><header class="record-header"><a href="/">Ward</a><h1>{html.escape(title)}</h1></header>{body}</main>
-<footer>By Lleywyn · <a href="/api/v1">API</a> · <a href="https://github.com/HiLleywyn/ward">Source</a></footer></body></html>""".encode()
+<footer>By Lleywyn · <a href="/api/v1">API</a> · <a href="https://github.com/HiLleywyn/ward">Source</a></footer><script src="/evidence.js"></script></body></html>""".encode()
 
 
-def scan_record_page(job: dict, report: dict | None) -> bytes:
+def scan_record_page(job: dict, report: dict | None, reviewed: dict | None = None) -> bytes:
     result = job.get("result") or {}
     symbol, label, _ = badge_state(job)
     facts = [
@@ -80,7 +81,7 @@ def scan_record_page(job: dict, report: dict | None) -> bytes:
     findings = result.get("findings", []) + analysis_assessment(job)["findings"]
     if findings:
         finding_html = "".join(
-            "<li><strong>{}</strong><code>{}</code><p>{}</p></li>".format(
+            '<li><strong>{}</strong><code>{}</code><div class="evidence-copy" data-evidence>{}</div></li>'.format(
                 html.escape(str(item.get("title", "Finding"))),
                 html.escape(str(item.get("path") or item.get("sha256") or "artifact")),
                 html.escape(str(item.get("detail", ""))),
@@ -96,7 +97,14 @@ def scan_record_page(job: dict, report: dict | None) -> bytes:
             html.escape(json.dumps(item.get("result") or {"error": item.get("error"), "status": item["status"]}, indent=2)),
         ) for item in job.get("analyses", [])
     )
-    body = f"""<section class="record-card"><dl class="record-facts">{rows}</dl></section>
+    evidence_links = []
+    if report is not None:
+        evidence_links.append(f'<a href="/api/v1/reports/{quote(job["id"], safe="")}">View scan evidence</a>')
+    if reviewed is not None:
+        query = html.escape(urlencode({"repository": reviewed["repository"]}), quote=True)
+        evidence_links.append(f'<a href="/api/record?{query}">View reviewed evidence</a>')
+    evidence = '<nav class="record-actions" aria-label="Evidence">' + "".join(evidence_links) + '</nav>' if evidence_links else ''
+    body = f"""<section class="record-card"><dl class="record-facts">{rows}</dl>{evidence}</section>
 <section class="record-card"><h2>Findings</h2><ul class="record-findings">{finding_html}</ul></section>
 <section class="record-card"><h2>Limits</h2><ul>{limitations or '<li>No additional limits recorded.</li>'}</ul></section>
 {analyses_html}
@@ -104,7 +112,7 @@ def scan_record_page(job: dict, report: dict | None) -> bytes:
     return _page("Scan Record", body)
 
 
-def repository_ledger_page(history: dict) -> bytes:
+def repository_ledger_page(history: dict, reviewed: dict | None = None) -> bytes:
     scans = list(reversed(history.get("scans", [])))
     rows = []
     for scan in scans:
@@ -129,7 +137,12 @@ def repository_ledger_page(history: dict) -> bytes:
         f"<li><code>{html.escape(str(item['repository']))}</code><span>shared commit {html.escape(str(item['commit'])[:12])}</span></li>"
         for item in history.get("related_repositories", [])
     )
+    reviewed_html = ''
+    if reviewed is not None:
+        query = html.escape(urlencode({"repository": reviewed["repository"]}), quote=True)
+        reviewed_html = f'<section class="record-card"><h2>Reviewed repository evidence</h2><div class="evidence-copy" data-evidence>{html.escape(reviewed["finding"])}</div><a href="/api/record?{query}">View reviewed evidence</a></section>'
     body = f"""<section class="record-card"><p>{html.escape(history['repository'])}</p><p>Earlier unknown results were not proven safe. This ledger reports only what each bounded scan observed.</p></section>
+{reviewed_html}
 <section class="record-card"><h2>Scans</h2><ul class="ledger-list">{''.join(rows) or '<li>No scans recorded.</li>'}</ul></section>
 <section class="record-card"><h2>Observed Changes</h2><ul class="ledger-list">{transitions or '<li>No finding transitions recorded.</li>'}</ul></section>
 <section class="record-card"><h2>Shared-Commit Repositories</h2><ul class="ledger-list">{related or '<li>No related scanned repositories found.</li>'}</ul><p>{html.escape(history['relationship_note'])}</p></section>"""

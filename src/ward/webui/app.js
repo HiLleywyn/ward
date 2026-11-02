@@ -60,29 +60,6 @@ function formatDuration(milliseconds) {
   return milliseconds < 1000 ? `${milliseconds} ms` : `${(milliseconds / 1000).toFixed(1)} s`;
 }
 
-function textElement(tag, className, text) {
-  const element = document.createElement(tag);
-  if (className) element.className = className;
-  element.textContent = text;
-  return element;
-}
-
-function evidenceText(tag, className, value) {
-  const element = textElement(tag, className, '');
-  const text = String(value ?? '');
-  const tokens = /`[^`\n]+`|\b(?:[a-f0-9]{128}|[a-f0-9]{64}|[a-f0-9]{40}|[a-f0-9]{32})\b|\b[A-Za-z_]\w*(?:\\[\w.$-]*[\w$-])+|\b[\w.-]+\.(?:exe|dll|rar|zip|aes|key|ps1|bat|cmd|js|py|json)\b|\b[A-Za-z]\w*_\w+\b/gi;
-  let end = 0;
-  for (const match of text.matchAll(tokens)) {
-    element.append(document.createTextNode(text.slice(end, match.index)));
-    const code = textElement('code', '', match[0].startsWith('`') ? match[0].slice(1, -1) : match[0]);
-    if (code.textContent.length >= 32) code.tabIndex = 0;
-    element.append(code);
-    end = match.index + match[0].length;
-  }
-  element.append(document.createTextNode(text.slice(end)));
-  return element;
-}
-
 function familyGuidance(records) {
   const section = document.createElement('div');
   section.className = 'remediation';
@@ -93,10 +70,49 @@ function familyGuidance(records) {
       if (descriptions.length > 1) {
         section.append(textElement('p', 'guidance-scope', records.filter(item => item[field] === description).map(item => item.repository).join(', ')));
       }
-      section.append(evidenceText('p', '', description));
+      section.append(evidenceParagraphs(description));
     }
   }
   return section;
+}
+
+function externalScanLinks(records) {
+  const links = textElement('div', 'family-links', '');
+  const providers = {'bazaar.abuse.ch': 'MalwareBazaar', 'www.virustotal.com': 'VirusTotal', 'virustotal.com': 'VirusTotal', 'threatfox.abuse.ch': 'ThreatFox'};
+  const seen = new Set();
+  for (const record of records) {
+    for (const value of [record.source_url, record.malware_db_url]) {
+      let url;
+      try { url = new URL(value); } catch { continue; }
+      const provider = providers[url.hostname];
+      if (!provider || url.protocol !== 'https:' || url.username || url.password || seen.has(url.href)) continue;
+      seen.add(url.href);
+      const link = textElement('a', '', 'External Scan');
+      link.href = url.href;
+      link.rel = 'noreferrer';
+      link.title = provider;
+      link.setAttribute('aria-label', `External Scan (${provider})`);
+      links.append(link);
+    }
+  }
+  return links;
+}
+
+function recordActions(scanHref, repositoryUrl) {
+  const actions = textElement('div', 'record-actions', '');
+  const scan = textElement('a', '', 'Ward Scan');
+  scan.href = scanHref;
+  actions.append(scan);
+  try {
+    const url = new URL(repositoryUrl);
+    if (url.protocol === 'https:' && !url.username && !url.password) {
+      const repository = textElement('a', '', 'Repository');
+      repository.href = url.href;
+      repository.rel = 'noreferrer';
+      actions.append(repository);
+    }
+  } catch { /* Older records can lack a repository URL. */ }
+  return actions;
 }
 
 function findingElement(finding) {
@@ -112,14 +128,6 @@ function findingElement(finding) {
   const detail = evidenceText('p', '', finding.detail);
   item.append(heading, location, detail);
   if (finding.sha256) item.append(textElement('code', 'finding-hash', `SHA-256 ${finding.sha256}`));
-  if (finding.source_url) {
-    const source = document.createElement('a');
-    source.href = finding.source_url;
-    source.rel = 'noreferrer';
-    source.textContent = 'Indicator source';
-    source.className = 'finding-source';
-    item.append(source);
-  }
   return item;
 }
 
@@ -158,10 +166,7 @@ function scanDetails(scan, expanded = false) {
   body.append(metadata, revision);
   if (scan.assessment?.pending) body.append(textElement('p', 'scan-analysis-state', `${scan.assessment.pending} follow-up analysis job(s) running`));
   if (scan.assessment?.coverage === 'partial') body.append(textElement('p', 'scan-analysis-state', 'Follow-up analysis has incomplete coverage. View the engine evidence below.'));
-  const recordLink = document.createElement('a');
-  recordLink.href = `/scans/${encodeURIComponent(scan.id)}`;
-  recordLink.textContent = 'Scan record';
-  body.append(recordLink);
+  body.append(recordActions(`/scans/${encodeURIComponent(scan.id)}`, scan.repository_url || `https://github.com/${scan.repository}`));
 
   for (const analysis of scan.analyses || []) {
     const details = document.createElement('details');
@@ -214,20 +219,6 @@ function scanDetails(scan, expanded = false) {
     body.append(list);
   } else {
     body.append(textElement('p', 'no-findings', 'No exact indicator or configured static rule matched. This does not prove the repository is safe.'));
-  }
-
-  if (scan.sources?.length) {
-    const sources = document.createElement('div');
-    sources.className = 'source-links';
-    sources.append(textElement('span', '', 'Supporting research'));
-    for (const url of scan.sources) {
-      const link = document.createElement('a');
-      link.href = url;
-      link.rel = 'noreferrer';
-      link.textContent = new URL(url).hostname;
-      sources.append(link);
-    }
-    body.append(sources);
   }
 
   const caveat = document.createElement('details');
@@ -288,18 +279,16 @@ function threatRow(item) {
   body.className = 'threat-body';
   const location = document.createElement('div');
   location.className = 'evidence-first';
-  location.append(
-    textElement('span', 'field-label', 'affected file'),
-    evidenceText('p', 'evidence-location', item.release),
-    textElement('code', 'affected-path', item.malicious_path),
-    evidenceText('p', '', item.finding),
-  );
-  const actions = document.createElement('div');
-  actions.className = 'record-actions';
-  const evidence = document.createElement('a');
-  evidence.href = `/api/record?repository=${encodeURIComponent(item.repository)}`;
-  evidence.textContent = 'View evidence';
-  actions.append(evidence);
+  const facts = textElement('dl', 'evidence-facts', '');
+  const files = textElement('dd', 'affected-files', '');
+  for (const path of item.malicious_path.split(' / ')) {
+    const code = textElement('code', 'affected-path', path);
+    if (path.length >= 32) code.tabIndex = 0;
+    files.append(code);
+  }
+  facts.append(textElement('dt', '', 'Revision'), evidenceText('dd', '', item.release), textElement('dt', '', 'Affected files'), files);
+  location.append(facts, textElement('h4', '', 'Finding'), evidenceParagraphs(item.finding));
+  const actions = recordActions(`/repository?target=${encodeURIComponent(item.repository)}&latest=1`, `https://github.com/${item.repository}`);
   body.append(location, actions);
   row.append(summary, body);
   return row;
@@ -372,18 +361,8 @@ function renderKnownThreats() {
       summary.append(textElement('h3', '', family), textElement('span', 'record-count', `${records.length} ${records.length === 1 ? 'repository' : 'repositories'}`), icon('chevron-down', 'chevron'));
       const header = document.createElement('div');
       header.className = 'family-intro';
-      const description = evidenceText('p', '', records[0].behavior);
-      const links = document.createElement('div');
-      links.className = 'family-links';
-      const source = document.createElement('a');
-      source.href = records[0].source_url;
-      source.rel = 'noreferrer';
-      source.textContent = records[0].source_name;
-      const database = document.createElement('a');
-      database.href = records[0].malware_db_url;
-      database.rel = 'noreferrer';
-      database.textContent = records[0].malware_db_name;
-      links.append(source, database);
+      const description = evidenceParagraphs(records[0].behavior);
+      const links = externalScanLinks(records);
       header.append(description, links, familyGuidance(records));
       group.append(summary, header);
       const pages = Math.max(1, Math.ceil(records.length / 25));
