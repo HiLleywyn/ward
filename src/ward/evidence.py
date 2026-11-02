@@ -206,7 +206,27 @@ class ResultStore:
         job = self._scan_job(row)
         if job is not None:
             job["analyses"] = self.analyses.list(scan_id)
+            self._attach_last_completed_scan(job)
         return job
+
+    def _attach_last_completed_scan(self, job: dict) -> None:
+        if job["kind"] != "repository" or job["status"] == "completed":
+            return
+        keys = self._repository_keys(job["target"])
+        branch = job.get("requested_ref")
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM scan_jobs WHERE kind='repository' AND status='completed' AND result IS NOT NULL "
+                "AND rowid < (SELECT rowid FROM scan_jobs WHERE id=?) ORDER BY rowid DESC", (job["id"],)
+            ).fetchall()
+        for row in rows:
+            previous = self._scan_job(row)
+            result = previous["result"]
+            if (keys & self._repository_keys(result.get("repository_url") or result.get("repository") or previous["target"])
+                    and (not branch or branch == (result.get("branch") or previous.get("requested_ref")))):
+                previous["analyses"] = self.analyses.list(previous["id"])
+                job["last_completed_scan"] = previous
+                return
 
     def list_scan_jobs(
         self,
@@ -451,6 +471,7 @@ class ResultStore:
             result_branch = result.get("branch") or job.get("requested_ref")
             if keys & self._repository_keys(result_target) and (not branch or branch == result_branch):
                 job["analyses"] = self.analyses.list(job["id"])
+                self._attach_last_completed_scan(job)
                 return job
         return None
 

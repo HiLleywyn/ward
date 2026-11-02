@@ -102,3 +102,42 @@ class LedgerAssessmentTests(LedgerStoreCase):
         self.assertEqual(job['result'], original)
         self.assertEqual(report_for_job(job)['verdict']['status'], 'malicious')
         self.assertEqual(badge_state(job)[1], 'malware detected')
+
+
+class RescanEvidenceTests(LedgerStoreCase):
+    def test_pending_failed_and_interrupted_refresh_keeps_scoped_previous_result(self):
+        from ward.views import badge_svg, scan_record_page
+        url = 'https://github.com/repro/project'
+        old = self.scan(url)
+        self.scan(url, branch='another', status='Unverified')
+        job, _ = self.store.create_scan_job(kind='repository', target=url, request_hash='c' * 64,
+            idempotency_key=None, cancel_token_hash='b' * 64, requested_ref='main')
+        for phase in ('queued', 'running', 'failed'):
+            if phase == 'running':
+                self.store.start_scan_job(job['id'])
+            if phase == 'failed':
+                self.store.fail_scan_job(job['id'], 'clone_error', 'Fixture clone failed')
+            latest = self.store.latest_repository_scan(url, 'main')
+            self.assertEqual(latest['status'], phase)
+            self.assertEqual(latest['last_completed_scan']['id'], old['id'])
+            self.assertIn('previous: malware detected', badge_state(latest)[1])
+            self.assertIn('refresh', badge_state(latest)[1])
+            svg = badge_svg(latest).decode()
+            self.assertIn(old['result']['commit'], svg)
+            self.assertIn(old['result']['scanned_at'], svg)
+            page = scan_record_page(self.store.scan_job(job['id']), None).decode()
+            self.assertIn('/scans/' + old['id'], page)
+            self.assertIn(old['result']['commit'], page)
+        fresh = self.scan(url, status='Unverified', commit='b' * 40)
+        self.assertEqual(self.store.latest_repository_scan(url, 'main')['id'], fresh['id'])
+        self.assertNotIn('last_completed_scan', self.store.latest_repository_scan(url, 'main'))
+        self.assertEqual(badge_state(self.store.latest_repository_scan(url, 'main'))[1], 'no known match')
+
+    def test_no_fallback_to_another_host_or_branch(self):
+        self.scan('https://gitlab.com/repro/project')
+        self.scan('https://github.com/repro/project', branch='another')
+        job, _ = self.store.create_scan_job(kind='repository', target='https://github.com/repro/project',
+            request_hash='c' * 64, idempotency_key=None, cancel_token_hash='b' * 64, requested_ref='main')
+        latest = self.store.latest_repository_scan(job['target'], 'main')
+        self.assertNotIn('last_completed_scan', latest)
+        self.assertEqual(badge_state(latest)[1], 'scanning')

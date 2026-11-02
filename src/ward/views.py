@@ -10,6 +10,11 @@ from .analysis import analysis_assessment
 def badge_state(job: dict | None) -> tuple[str, str, str]:
     if job is None:
         return "?", "not scanned", "#77736b"
+    previous = job.get("last_completed_scan")
+    if job["status"] != "completed" and previous:
+        symbol, label, color = badge_state(previous)
+        refresh = "refreshing" if job["status"] in {"queued", "running"} else "refresh incomplete"
+        return symbol, f"previous: {label}; {refresh}", color
     if job["status"] in {"queued", "running"}:
         return "…", "scanning", "#d8b45c"
     if job["status"] != "completed" or not job.get("result"):
@@ -43,7 +48,11 @@ def badge_svg(job: dict | None) -> bytes:
     left_width = 48
     right_width = max(92, len(right) * 7 + 16)
     total = left_width + right_width
-    label = html.escape(f"Ward: {status}", quote=True)
+    provenance = ""
+    if job and job.get("last_completed_scan"):
+        result = job["last_completed_scan"]["result"]
+        provenance = f". Previous scan: commit {result.get('commit', 'unknown')}, branch {result.get('branch', 'unknown')}, recorded {result.get('scanned_at', 'unknown')}. Not a verdict on the pending revision."
+    label = html.escape(f"Ward: {status}" + provenance, quote=True)
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{total}" height="20" role="img" aria-label="{label}">
 <title>{label}</title>
 <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-opacity=".08"/></linearGradient>
@@ -64,6 +73,13 @@ def _page(title: str, body: str) -> bytes:
 def scan_record_page(job: dict, report: dict | None, reviewed: dict | None = None) -> bytes:
     result = job.get("result") or {}
     symbol, label, _ = badge_state(job)
+    previous_html = ""
+    if job.get("last_completed_scan"):
+        previous = job["last_completed_scan"]
+        prior = previous["result"]
+        previous_html = '<section class="record-card"><h2>Previous Completed Scan</h2><p>' + html.escape(
+            f"{badge_state(previous)[1]} on commit {prior.get('commit', 'unknown')}, branch {prior.get('branch', 'unknown')}, recorded {prior.get('scanned_at', previous['updated_at'])}. This result applies to that revision; the refresh has not completed."
+        ) + f'</p><a href="/scans/{quote(previous["id"], safe="")}">View previous evidence</a></section>'
     facts = [
         ("Status", f"{symbol} {label}"),
         ("Kind", job["kind"]),
@@ -105,6 +121,7 @@ def scan_record_page(job: dict, report: dict | None, reviewed: dict | None = Non
         evidence_links.append(f'<a href="/api/record?{query}">View reviewed evidence</a>')
     evidence = '<nav class="record-actions" aria-label="Evidence">' + "".join(evidence_links) + '</nav>' if evidence_links else ''
     body = f"""<section class="record-card"><dl class="record-facts">{rows}</dl>{evidence}</section>
+{previous_html}
 <section class="record-card"><h2>Findings</h2><ul class="record-findings">{finding_html}</ul></section>
 <section class="record-card"><h2>Limits</h2><ul>{limitations or '<li>No additional limits recorded.</li>'}</ul></section>
 {analyses_html}
