@@ -41,7 +41,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
     coordinator = ScanCoordinator(store, scan_slot)
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "Ward/0.5.5"
+        server_version = "Ward/0.5.6"
         sys_version = ""
 
         def setup(self):
@@ -107,24 +107,8 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 raise APIError(400, "invalid_json", "Request body must contain valid JSON") from exc
 
         def _consume_scan_quota(self) -> None:
-            now = time.monotonic()
-            client_key = (self.headers.get("CF-Connecting-IP") or self.client_address[0])[:64]
-            with scan_lock:
-                while scans and now - scans[0] > 3600:
-                    scans.popleft()
-                for key in list(scans_by_client):
-                    bucket = scans_by_client[key]
-                    while bucket and now - bucket[0] > 3600:
-                        bucket.popleft()
-                    if not bucket:
-                        del scans_by_client[key]
-                client_scans = scans_by_client.setdefault(client_key, deque())
-                if public and len(scans) >= 120:
-                    raise APIError(429, "rate_limit_exceeded", "Ward has reached its global public scan limit; try again later")
-                if public and len(client_scans) >= 12:
-                    raise APIError(429, "rate_limit_exceeded", "The public scanner is cooling down; try again later")
-                scans.append(now)
-                client_scans.append(now)
+            # Admission is bounded by the queue and worker concurrency, not an hourly allowance.
+            return
 
         def _origin_allowed(self) -> bool:
             origin = self.headers.get("Origin")
@@ -472,15 +456,9 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                     target = normalize_repository_url(str(payload.get("target", "")))
                     now = time.monotonic()
                     with scan_lock:
-                        while scans and now - scans[0] > 3600:
-                            scans.popleft()
-                        if public and len(scans) >= 6:
-                            self._send_json({"error": "The public scanner is cooling down. Try again later."}, HTTPStatus.TOO_MANY_REQUESTS)
-                            return
                         if not scan_slot.acquire(blocking=False):
                             self._send_json({"error": "Another repository scan is running. Try again in a moment."}, HTTPStatus.TOO_MANY_REQUESTS)
                             return
-                        scans.append(now)
                     try:
                         result = scan_repository(target)
                         store.record_repository_scan(result)
@@ -499,12 +477,6 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                         if cached and now - cached[0] < 900:
                             assessment, evidence = cached[1:]
                         else:
-                            while checks and now - checks[0] > 3600:
-                                checks.popleft()
-                            if public and len(checks) >= 8:
-                                self._send_json({"error": "Live GitHub checks are cooling down. Known warnings and file checks still work. Try again later."}, HTTPStatus.TOO_MANY_REQUESTS)
-                                return
-                            checks.append(now)
                             snapshot = client.snapshot(owner, repository)
                             assessment = assess_repository(snapshot)
                             evidence = snapshot_evidence(snapshot)

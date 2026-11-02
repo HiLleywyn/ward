@@ -129,7 +129,7 @@ A portable plugin package and Ward skill are under `integrations/ward-plugin`.
 
 ## Security and limits
 
-- Public submissions use per-client and global in-memory hourly limits plus one bounded worker.
+- Public submissions have no hourly allowance. A bounded queue and one repository worker control simultaneous work.
 - Git hosts are restricted to public HTTPS on port 443. Credentials, fragments, query strings, local addresses, and private DNS results are rejected.
 - The scanner pins the validated public IP in libcurl for the clone to reduce DNS-rebinding risk and disables Git HTTP redirects, file protocol, ext protocol, prompts, and LFS downloads.
 - Repository, file count, byte, hash, text, archive expansion, process, memory, and request body limits remain enforced.

@@ -1,7 +1,7 @@
 services:
   ward:
     build: .
-    image: ward:0.5.5
+    image: ward:0.5.6
     container_name: ward
     restart: unless-stopped
     ports:

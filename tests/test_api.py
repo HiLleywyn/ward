@@ -112,6 +112,24 @@ class WardAPITests(unittest.TestCase):
             self.request(f"/api/v1/artifacts/{digest}")
         self.assertEqual(absent.exception.code, 404)
 
+    def test_scan_replays_do_not_exhaust_an_hourly_allowance(self):
+        body = {"kind": "sha256", "sha256": "a" * 64}
+        headers = {"Idempotency-Key": "quota-regression"}
+        _, _, first = self.request("/api/v1/scans", method="POST", body=body, headers=headers)
+        self.wait_for_scan(first["id"])
+        for _ in range(125):
+            status, _, repeated = self.request("/api/v1/scans", method="POST", body=body, headers=headers)
+            self.assertEqual(status, 200)
+            self.assertEqual(repeated["id"], first["id"])
+        for _ in range(15):
+            _, _, response = self.request("/mcp", method="POST", body={
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "ward_submit_scan", "arguments": {
+                    **body, "idempotency_key": "quota-regression",
+                }},
+            })
+            self.assertNotIn("isError", response["result"])
+
     def test_errors_pagination_openapi_and_ssrf_rejection(self):
         document = openapi_document()
         self.assertEqual(document["openapi"], "3.1.0")

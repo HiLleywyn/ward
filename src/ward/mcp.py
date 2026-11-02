@@ -232,7 +232,7 @@ def handle_message(
             result = {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": {"tools": {"listChanged": False}, "resources": {"listChanged": False}},
-                "serverInfo": {"name": "ward", "version": "0.5.5"},
+                "serverInfo": {"name": "ward", "version": "0.5.6"},
                 "instructions": "Ward scans public Git repositories and hashes without executing them. Unknown never means safe.",
             }
         elif method == "ping":
