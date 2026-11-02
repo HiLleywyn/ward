@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 
 ACTION_SCRIPT = Path(__file__).parents[1] / ".github/actions/ward/ward_scan.py"
+ACTION_MANIFEST = Path(__file__).parents[1] / ".github/actions/ward/action.yml"
 SPEC = importlib.util.spec_from_file_location("ward_github_action", ACTION_SCRIPT)
 ward_action = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
@@ -16,6 +17,11 @@ SPEC.loader.exec_module(ward_action)
 
 
 class WardGitHubActionTests(unittest.TestCase):
+    def test_manifest_binds_pull_requests_to_their_head_commit(self):
+        manifest = ACTION_MANIFEST.read_text(encoding="utf-8")
+        self.assertIn("github.event.pull_request.head.repo.clone_url", manifest)
+        self.assertIn("github.event.pull_request.head.sha", manifest)
+
     def test_completed_inspection_writes_linked_badge_and_exact_record(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "output"

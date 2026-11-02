@@ -1,5 +1,7 @@
 # Ward
 
+[![Ward](https://ward.lley.cat/api/v1/badges/HiLleywyn/ward.svg?branch=main)](https://ward.lley.cat/repositories/HiLleywyn/ward)
+
 Public site: [ward.lley.cat](https://ward.lley.cat)
 
 Developer interfaces: [REST API and MCP](docs/API.md) · [OpenAPI 3.1](https://ward.lley.cat/api/v1/openapi.json)

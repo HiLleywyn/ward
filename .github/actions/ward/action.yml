@@ -9,13 +9,13 @@ inputs:
     default: https://ward.lley.cat
   repository-url:
     description: Public HTTPS Git repository URL
-    default: ${{ github.server_url }}/${{ github.repository }}
+    default: ${{ github.event.pull_request.head.repo.clone_url || format('{0}/{1}', github.server_url, github.repository) }}
   ref:
     description: Branch or tag to inspect
     default: ${{ github.head_ref || github.ref_name }}
   expected-commit:
     description: Exact commit that the inspected ref must resolve to
-    default: ${{ github.sha }}
+    default: ${{ github.event.pull_request.head.sha || github.sha }}
   timeout-seconds:
     description: Maximum time to wait for Ward
     default: "180"
@@ -44,5 +44,5 @@ runs:
         WARD_REF: ${{ inputs.ref }}
         WARD_EXPECTED_COMMIT: ${{ inputs.expected-commit }}
         WARD_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
-        WARD_IDEMPOTENCY_KEY: github:${{ github.repository_id }}:${{ github.sha }}
+        WARD_IDEMPOTENCY_KEY: github:${{ github.repository_id }}:${{ inputs.expected-commit }}
       run: python "$GITHUB_ACTION_PATH/ward_scan.py"
