@@ -128,7 +128,7 @@ check('OpenAPI contract covers implemented resources', () => {
 check('Ward plugin package is portable and secret-free', () => {
   const plugin = json('integrations/ward-plugin/plugin.json');
   const mcp = json('integrations/ward-plugin/mcp.json');
-  const skill = read('integrations/ward-plugin/skills/ward-scanner/SKILL.md');
+  const skill = read('integrations/ward-plugin/skills/ward-scanner/SKILL.md').replace(/\r\n/g, '\n');
   assert(plugin.$schema === 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json', 'plugin schema is invalid');
   assert(plugin.extensions?.['com.openai']?.interface?.shortDescription?.length <= 30, 'plugin subtitle exceeds 30 characters');
   assert(mcp.$schema === 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json', 'MCP schema is invalid');

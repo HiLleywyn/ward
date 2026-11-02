@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "name": "Ward CI",
+  "triggers": {"push": true, "tags": false, "manual": true},
+  "stages": [
+    {
+      "id": "verify",
+      "label": "Verify Ward",
+      "image": "lley-build:2026.10",
+      "needs": [],
+      "cpus": 1,
+      "memory_mb": 512,
+      "timeout_seconds": 300,
+      "network": {"allow_hosts": ["pypi.org", "files.pythonhosted.org"]},
+      "variables": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+        "PIP_NO_CACHE_DIR": "1",
+        "WARD_STATE_DIR": "/tmp/ward-ci-state"
+      },
+      "secrets": {},
+      "commands": [
+        ["python", "-m", "venv", ".venv"],
+        [".venv/bin/python", "-m", "pip", "install", "--no-cache-dir", "-e", "."],
+        [".venv/bin/python", "-m", "pip", "check"],
+        [".venv/bin/python", "tools/run-tests-junit.py"],
+        [".venv/bin/python", "-m", "ward", "validate"],
+        [".venv/bin/python", "-m", "compileall", "-q", "src"],
+        ["node", "tools/ci-check.mjs"]
+      ],
+      "reports": [
+        {"path": "reports/python.xml", "format": "junit"},
+        {"path": "reports/ci.xml", "format": "junit"}
+      ],
+      "artifacts": []
+    }
+  ]
+}

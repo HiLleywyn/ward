@@ -60,6 +60,8 @@ Python 3.10 or newer is required.
 python -m pip install -e .
 ```
 
+See [CI and test setup](docs/CI.md) for the git.lley.cat Tests page configuration.
+
 An optional `GITHUB_TOKEN` raises GitHub API rate limits. The token only needs
 read access to public repositories.
 
