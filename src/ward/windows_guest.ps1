@@ -61,7 +61,7 @@ try {
 $deadline = (Get-Date).AddSeconds(60)
 if ($process) {
     while ((Get-Date) -lt $deadline) {
-        foreach ($event in @(Get-Event -SourceIdentifier WardProcessStart -ErrorAction SilentlyContinue)) {
+        foreach ($event in @(Get-Event -SourceIdentifier WardProcessStart -MaxEvents 100 -ErrorAction SilentlyContinue)) {
             if ($events.Count -lt 500) {
                 $entry = $event.SourceEventArgs.NewEvent
                 $events += @{pid=[int]$entry.ProcessID; parent_pid=[int]$entry.ParentProcessID; name=[string]$entry.ProcessName}

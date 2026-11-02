@@ -137,6 +137,7 @@ class WindowsPolicyTests(unittest.TestCase):
         self.assertIn("-OperationTimeoutSec 10", guest)
         self.assertIn("Select-Object -First 500", guest)
         self.assertNotIn("-Recurse", guest)
+        self.assertIn("-MaxEvents 100", guest)
         self.assertIn("executed=$executed", guest)
 
     def test_only_explicit_sandbox_identifiers_are_used_for_teardown(self):

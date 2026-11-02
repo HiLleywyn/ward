@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ward-github-scanner"
-version = "0.6.4"
+version = "0.6.5"
 description = "A public Git repository scanner backed by exact malware evidence"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -37,7 +37,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
     coordinator = ScanCoordinator(store, scan_slot)
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "Ward/0.6.4"
+        server_version = "Ward/0.6.5"
         sys_version = ""
 
         def setup(self):
