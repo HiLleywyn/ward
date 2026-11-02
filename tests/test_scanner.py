@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import os
+import struct
 import subprocess
 import tempfile
 import unittest
 import zipfile
+import zlib
 from pathlib import Path
 
 from unittest.mock import patch
@@ -95,6 +97,61 @@ class RepositoryUrlTests(unittest.TestCase):
 
 
 class StaticInspectionTests(unittest.TestCase):
+    @staticmethod
+    def _pyinstaller_fixture(members: list[tuple[str, bytes, str]]) -> bytes:
+        prefix = b"MZ" + b"\0" * 62
+        payload = bytearray()
+        toc = bytearray()
+        for name, content, typecode in members:
+            packed = zlib.compress(content)
+            offset = len(payload)
+            payload.extend(packed)
+            encoded_name = name.encode() + b"\0"
+            entry_length = 18 + len(encoded_name)
+            toc.extend(struct.pack("!IIIIBc", entry_length, offset, len(packed), len(content), 1, typecode.encode()))
+            toc.extend(encoded_name)
+        toc_offset = len(payload)
+        cookie_size = struct.calcsize("!8sIIII64s")
+        package_length = len(payload) + len(toc) + cookie_size
+        cookie = struct.pack(
+            "!8sIIII64s",
+            b"MEI\x0c\x0b\x0a\x0b\x0e",
+            package_length,
+            toc_offset,
+            len(toc),
+            313,
+            b"python3.13.dll\0".ljust(64, b"\0"),
+        )
+        return prefix + payload + toc + cookie
+
+    def test_pyinstaller_encrypted_payload_tooling_is_reported_without_execution(self):
+        fixture = self._pyinstaller_fixture([
+            ("blank.aes", b"encrypted payload fixture", "x"),
+            ("rar.exe", b"MZ fixture archiver", "b"),
+            ("rarreg.key", b"fixture key", "x"),
+        ])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Built.exe").write_bytes(fixture)
+            result = inspect_tree(root, indicators={"indicators": []})
+
+        finding = next(item for item in result["findings"] if item["kind"] == "pyinstaller-encrypted-payload")
+        self.assertEqual(finding["severity"], "high")
+        self.assertIn("blank.aes", finding["detail"])
+        self.assertIn("rar.exe", finding["detail"])
+        self.assertEqual(result["archives"], 1)
+
+    def test_unreadable_file_marks_scan_partial_instead_of_claiming_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "payload.bin").write_bytes(b"fixture")
+            with patch("pathlib.Path.open", side_effect=OSError("blocked by host protection")):
+                result = inspect_tree(root, indicators={"indicators": []})
+
+        self.assertTrue(result["partial"])
+        self.assertEqual(result["hashed_bytes"], 0)
+        self.assertIn("file-unreadable", {item["kind"] for item in result["findings"]})
+
     def test_unreadable_archive_marks_inspection_partial(self):
         with tempfile.TemporaryDirectory() as directory:
             archive = Path(directory) / "opaque.zip"

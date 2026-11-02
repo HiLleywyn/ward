@@ -34,6 +34,7 @@ class PublicWebTests(unittest.TestCase):
                             'opus-5-0/opus-5-0.github.io',
                             'lehhlass/Fluxus-Roblox-Executor',
                             'hanneshow/Fluxus-Roblox-Executor',
+                            'sjyjoghkkjj/Discord-Nitro-Generator',
                         },
                         {item['repository'] for item in reviewed['records']},
                     )

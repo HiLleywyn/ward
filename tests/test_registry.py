@@ -68,6 +68,20 @@ class RegistryTests(unittest.TestCase):
             },
         )
 
+    def test_discord_nitro_built_hash_is_bound_to_pinned_record(self):
+        from ward.data import advisory_directory
+
+        directory = advisory_directory()
+        indicators = json.loads((directory / "indicators.json").read_text(encoding="utf-8"))
+        records = json.loads((directory / "malware-records.json").read_text(encoding="utf-8"))
+        digest = "4a5cdd67f46c92c5d00495057c7715457bef4fcd5d8915a0239018142d8101f2"
+
+        self.assertTrue(any(item["sha256"] == digest and item["status"] == "confirmed" for item in indicators["indicators"]))
+        record = next(item for item in records["records"] if item["id"] == "discord-nitro-built-pyinstaller")
+        self.assertEqual(record["repository"], "sjyjoghkkjj/Discord-Nitro-Generator")
+        self.assertEqual(record["artifact"], "Built.exe")
+        self.assertIn("451f057fa9c67739e37b8bcff2db7e2094e8c982", record["release"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,10 +6,12 @@ import json
 import os
 import re
 import socket
+import struct
 import subprocess
 import tempfile
 import time
 import zipfile
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
@@ -36,6 +38,11 @@ TEXT_SUFFIXES = {
 }
 EXECUTABLE_SUFFIXES = {".apk", ".app", ".bat", ".cmd", ".com", ".dll", ".dylib", ".exe", ".jar", ".msi", ".ps1", ".scr", ".sh", ".so"}
 ARCHIVE_SUFFIXES = {".zip", ".jar"}
+PYINSTALLER_MAGIC = b"MEI\x0c\x0b\x0a\x0b\x0e"
+PYINSTALLER_COOKIE_FORMATS = ((88, "!8sIIII64s"), (24, "!8sIIII"))
+MAX_PYINSTALLER_TOC_BYTES = 1024 * 1024
+MAX_PYINSTALLER_ENTRIES = 2_000
+MAX_PYINSTALLER_MEMBER_BYTES = 4 * 1024 * 1024
 
 PATTERNS = (
     (
@@ -252,6 +259,146 @@ def _archive_findings(path: Path, display_path: str) -> tuple[list[dict], int]:
     return findings, inspected
 
 
+def _pyinstaller_entries(data: bytes) -> list[dict] | None:
+    cookie_position = data.rfind(PYINSTALLER_MAGIC)
+    if cookie_position < 0:
+        return None
+    for cookie_size, cookie_format in PYINSTALLER_COOKIE_FORMATS:
+        if cookie_position + cookie_size > len(data):
+            continue
+        try:
+            cookie = struct.unpack(cookie_format, data[cookie_position:cookie_position + cookie_size])
+        except struct.error:
+            continue
+        package_length, toc_offset, toc_length = cookie[1:4]
+        package_start = cookie_position + cookie_size - package_length
+        toc_start = package_start + toc_offset
+        toc_end = toc_start + toc_length
+        if (
+            package_start < 0
+            or toc_length <= 0
+            or toc_length > MAX_PYINSTALLER_TOC_BYTES
+            or toc_start < package_start
+            or toc_end > cookie_position
+        ):
+            continue
+        entries: list[dict] = []
+        cursor = toc_start
+        valid = True
+        while cursor < toc_end and len(entries) < MAX_PYINSTALLER_ENTRIES:
+            if cursor + 18 > toc_end:
+                valid = False
+                break
+            try:
+                entry_length, offset, compressed_length, uncompressed_length, compressed, typecode = struct.unpack(
+                    "!IIIIBc", data[cursor:cursor + 18]
+                )
+            except struct.error:
+                valid = False
+                break
+            if entry_length < 19 or cursor + entry_length > toc_end:
+                valid = False
+                break
+            name_bytes = data[cursor + 18:cursor + entry_length].split(b"\0", 1)[0]
+            try:
+                name = name_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                name = name_bytes.decode("utf-8", errors="replace")
+            member_start = package_start + offset
+            member_end = member_start + compressed_length
+            if (
+                member_start < package_start
+                or member_end > toc_start
+                or uncompressed_length > MAX_PYINSTALLER_MEMBER_BYTES
+            ):
+                valid = False
+                break
+            entries.append({
+                "name": name,
+                "typecode": typecode.decode("latin-1"),
+                "compressed": bool(compressed),
+                "compressed_length": compressed_length,
+                "uncompressed_length": uncompressed_length,
+                "start": member_start,
+                "end": member_end,
+            })
+            cursor += entry_length
+        if valid and cursor == toc_end and entries:
+            return entries
+    raise ValueError("PyInstaller archive metadata is malformed or outside inspection limits")
+
+
+def _bounded_zlib_decompress(data: bytes, maximum: int) -> bytes:
+    decompressor = zlib.decompressobj()
+    output = decompressor.decompress(data, maximum + 1)
+    if len(output) > maximum or decompressor.unconsumed_tail:
+        raise ValueError("decompressed PyInstaller member exceeds inspection limit")
+    output += decompressor.flush(maximum + 1 - len(output))
+    if len(output) > maximum:
+        raise ValueError("decompressed PyInstaller member exceeds inspection limit")
+    return output
+
+
+def _printable_strings(data: bytes) -> str:
+    strings = [match.group().decode("latin-1") for match in re.finditer(rb"[ -~]{6,}", data)]
+    return "\n".join(strings)
+
+
+def _pyinstaller_findings(path: Path, display_path: str) -> tuple[list[dict], bool, bool]:
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return [], True, False
+    try:
+        entries = _pyinstaller_entries(data)
+    except ValueError:
+        return [{
+            "kind": "pyinstaller-unreadable",
+            "severity": "info",
+            "title": "PyInstaller bundle could not be inspected",
+            "path": display_path,
+            "detail": "Ward found a PyInstaller archive marker, but its bounded archive parser could not safely inventory the bundle.",
+        }], True, True
+    if entries is None:
+        return [], False, False
+
+    findings: list[dict] = []
+    names = {entry["name"].lower() for entry in entries if entry["name"]}
+    encrypted = sorted(name for name in names if Path(name).suffix in {".aes", ".enc", ".encrypted"})
+    archivers = sorted(name for name in names if Path(name).name in {"7z.exe", "rar.exe", "winrar.exe"})
+    key_material = sorted(name for name in names if Path(name).name in {"rarreg.key", "key.bin", "password.txt"})
+    if encrypted and archivers:
+        details = ["encrypted payload " + ", ".join(encrypted), "embedded archiver " + ", ".join(archivers)]
+        if key_material:
+            details.append("key material " + ", ".join(key_material))
+        findings.append({
+            "kind": "pyinstaller-encrypted-payload",
+            "severity": "high",
+            "title": "Packed executable bundles encrypted payload tooling",
+            "path": display_path,
+            "detail": "The PyInstaller bundle contains " + "; ".join(details) + ". This combination conceals bundled content and requires review; it is not alone proof of malware.",
+        })
+
+    budget = 2 * 1024 * 1024
+    for entry in entries:
+        if budget <= 0 or entry["compressed_length"] > 512 * 1024 or entry["uncompressed_length"] > 512 * 1024:
+            continue
+        if entry["typecode"] not in {"m", "M", "s", "x"}:
+            continue
+        member = data[entry["start"]:entry["end"]]
+        try:
+            if entry["compressed"]:
+                member = _bounded_zlib_decompress(member, min(entry["uncompressed_length"], 512 * 1024))
+        except (ValueError, zlib.error):
+            continue
+        budget -= len(member)
+        text = _printable_strings(member)
+        if text:
+            name = entry["name"] or "entrypoint"
+            findings.extend(_pattern_findings(text, f"{display_path}!{name}"))
+    return findings, False, True
+
+
 def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
     indicators = indicators or load_indicators(advisory_directory() / "indicators.json")
     known_hashes = {
@@ -262,6 +409,7 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
     findings: list[dict] = []
     file_count = total_bytes = hashed_bytes = text_files = archives = executable_files = 0
     truncated = False
+    coverage_incomplete = False
     for path in sorted(root.rglob("*")):
         if ".git" in path.parts or path.is_symlink() or not path.is_file():
             continue
@@ -281,6 +429,7 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
         suffix = path.suffix.lower()
         if suffix in EXECUTABLE_SUFFIXES:
             executable_files += 1
+        read_error = False
         if size <= MAX_FILE_BYTES and hashed_bytes + size <= MAX_HASH_BYTES:
             digest = hashlib.sha256()
             try:
@@ -301,12 +450,36 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
                         "source_url": match["source_url"],
                     })
             except OSError:
-                pass
+                read_error = True
+                coverage_incomplete = True
+                findings.append({
+                    "kind": "file-unreadable",
+                    "severity": "info",
+                    "title": "File could not be read",
+                    "path": relative,
+                    "detail": "Ward recorded the file but could not hash or inspect its bytes, so coverage is incomplete.",
+                })
+        else:
+            coverage_incomplete = True
+            findings.append({
+                "kind": "file-unhashed",
+                "severity": "info",
+                "title": "File was outside hashing limits",
+                "path": relative,
+                "detail": "Ward recorded the file but did not hash its bytes because a per-file or scan-wide hashing limit was reached.",
+            })
         if suffix in ARCHIVE_SUFFIXES:
             archive_findings, archive_text = _archive_findings(path, relative)
             findings.extend(archive_findings)
             text_files += archive_text
             archives += 1
+        if suffix == ".exe" and size <= MAX_FILE_BYTES and not read_error:
+            packed_findings, packed_incomplete, packed_archive = _pyinstaller_findings(path, relative)
+            findings.extend(packed_findings)
+            if packed_archive:
+                archives += 1
+            if packed_incomplete:
+                coverage_incomplete = True
         if size <= MAX_TEXT_BYTES and suffix in TEXT_SUFFIXES:
             try:
                 text = _decode_text(path.read_bytes())
@@ -343,7 +516,7 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
         "archives": archives,
         "executable_files": executable_files,
         "truncated": truncated,
-        "partial": truncated or archive_incomplete,
+        "partial": truncated or archive_incomplete or coverage_incomplete,
         "findings": findings[:100],
     }
 
