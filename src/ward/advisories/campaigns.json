@@ -355,6 +355,57 @@
         }
       ],
       "validation_notes": "The repository and latest release were live on 2026-11-02. Ward downloaded and extracted the public release only inside Kali, verified the archive and DLL hashes, and statically decoded the custom section without executing either PE. Similar WinGup and libcurl sideloading has been publicly documented elsewhere, but this record does not claim a shared operator, command-and-control server, or malware family without direct evidence."
+    },
+    {
+      "id": "2026-11-activation-gateway-png-hollowing",
+      "title": "activation-gateway PNG process-hollowing delivery wave",
+      "status": "confirmed-with-repository-artifacts",
+      "first_public_report": "2026-11-02",
+      "impersonated_projects": [
+        "Honkai Star Rail trainer",
+        "Windows and Office activation utility"
+      ],
+      "reported_behavior": [
+        "direct in-memory execution of a remote PowerShell wrapper",
+        "instructions to disable antivirus protection",
+        "base64 PowerShell obfuscation",
+        "payload and loader source concealed in PNG tEXt chunks",
+        "XOR and base64 payload reconstruction",
+        "C# process hollowing into Windows system executables",
+        "temporary-directory execution fallback"
+      ],
+      "confirmed_repository_urls": [
+        "https://github.com/oiluj3D/star-rail-trainer-suite",
+        "https://github.com/rajay782/windows-suite-migration-auditor"
+      ],
+      "confirmed_sha256": [
+        "2d335822db6d0164b3ec4df394311d832b4d804ca49430f8c25d7c329a8efd90",
+        "a5d595564c0b9e6036459dac1c5ade5f1df6e779856aa2d704ea0f55d3e8c31a",
+        "97d23bff9d4a34331bb2f499b7b1d6765b16f79ee6bb390b94d1fbb9d426c980"
+      ],
+      "evidence": [
+        {
+          "url": "https://github.com/oiluj3D/star-rail-trainer-suite/blob/54904cd1a450a0acbc1854d68778907e476823af/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/rajay782/windows-suite-migration-auditor/blob/78d4a0f9757d302dedd1d1fe39cf8dddb540a19a/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://activation-gateway.cc/update/ps-activator",
+          "type": "live-distribution-artifact",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://activation-gateway.cc/i/main.png",
+          "type": "live-payload-carrier",
+          "attribution": "Ward public evidence collection"
+        }
+      ],
+      "validation_notes": "Both repositories were live and independently pinned on 2026-11-02. Ward fetched the shared public stages only inside Kali and reproduced their base64, PNG tEXt, XOR, and C# decoding chain with bounded tools. The recovered source proves a process-hollowing execution mechanism, but Ward does not claim a final family name or account-operator identity without independent evidence."
     }
   ]
 }

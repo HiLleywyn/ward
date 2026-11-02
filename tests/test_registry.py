@@ -236,6 +236,49 @@ class RegistryTests(unittest.TestCase):
             campaign["confirmed_repository_urls"],
         )
 
+    def test_activation_gateway_wave_is_bound_to_two_live_repositories(self):
+        from ward.data import advisory_directory
+
+        directory = advisory_directory()
+        indicators = json.loads((directory / "indicators.json").read_text(encoding="utf-8"))
+        records = json.loads((directory / "malware-records.json").read_text(encoding="utf-8"))
+        campaigns = json.loads((directory / "campaigns.json").read_text(encoding="utf-8"))
+        digests = {
+            "2d335822db6d0164b3ec4df394311d832b4d804ca49430f8c25d7c329a8efd90",
+            "a5d595564c0b9e6036459dac1c5ade5f1df6e779856aa2d704ea0f55d3e8c31a",
+            "97d23bff9d4a34331bb2f499b7b1d6765b16f79ee6bb390b94d1fbb9d426c980",
+        }
+        repositories = {
+            "oiluj3D/star-rail-trainer-suite",
+            "rajay782/windows-suite-migration-auditor",
+        }
+
+        wave_records = [
+            item
+            for item in records["records"]
+            if item["malware"] == "activation-gateway PNG process-hollowing loader"
+        ]
+        self.assertEqual(repositories, {item["repository"] for item in wave_records})
+        self.assertTrue(all(item["status"] == "FAIL" for item in wave_records))
+        self.assertEqual(
+            digests,
+            {
+                item["sha256"]
+                for item in indicators["indicators"]
+                if item.get("campaign") == "activation-gateway PNG process-hollowing wave"
+            },
+        )
+        campaign = next(
+            item
+            for item in campaigns["campaigns"]
+            if item["id"] == "2026-11-activation-gateway-png-hollowing"
+        )
+        self.assertEqual(digests, set(campaign["confirmed_sha256"]))
+        self.assertEqual(
+            {f"https://github.com/{repository}" for repository in repositories},
+            set(campaign["confirmed_repository_urls"]),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

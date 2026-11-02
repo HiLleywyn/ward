@@ -54,6 +54,8 @@ class PublicWebTests(unittest.TestCase):
                             'ConstablePucker/Honkai-Star-Rail-Cheat',
                             'hypergooseoverpass/Rust-External-Cheat',
                             'Separatedimanacle/Phantom-Blade-Zero-Cheat',
+                            'oiluj3D/star-rail-trainer-suite',
+                            'rajay782/windows-suite-migration-auditor',
                         },
                         {item['repository'] for item in reviewed['records']},
                     )
