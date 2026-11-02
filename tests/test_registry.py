@@ -45,7 +45,7 @@ class RegistryTests(unittest.TestCase):
             problems = validate_registry(directory)
         self.assertTrue(any(problem.message == "invalid SHA-256" for problem in problems))
 
-    def test_santastealer_hash_is_bound_to_both_fluxus_records(self):
+    def test_santastealer_hash_is_bound_to_three_live_repository_records(self):
         from ward.data import advisory_directory
 
         directory = advisory_directory()
@@ -60,11 +60,12 @@ class RegistryTests(unittest.TestCase):
             {
                 "lehhlass/Fluxus-Roblox-Executor",
                 "hanneshow/Fluxus-Roblox-Executor",
+                "ennelsyf/FortniteExternalCheat",
             },
             {
                 item["repository"]
                 for item in records["records"]
-                if item["malware"] == "SantaStealer"
+                if item["malware"].startswith("SantaStealer")
             },
         )
 

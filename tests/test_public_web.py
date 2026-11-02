@@ -37,6 +37,7 @@ class PublicWebTests(unittest.TestCase):
                             'opus-5-0/opus-5-0.github.io',
                             'lehhlass/Fluxus-Roblox-Executor',
                             'hanneshow/Fluxus-Roblox-Executor',
+                            'ennelsyf/FortniteExternalCheat',
                             'sjyjoghkkjj/Discord-Nitro-Generator',
                             'J-Vinicius/nova-ui',
                             'lokyfordev/pulse-toolkit',
