@@ -34,16 +34,22 @@ def run_tool(name, command, timeout):
         error_size = errors.tell()
         errors.seek(max(0, error_size - 2000))
         warnings = errors.read(2000).decode("utf-8", errors="replace").strip()
-    if size >= MAX_OUTPUT or error_size >= MAX_OUTPUT:
-        return {"name": name, "status": "partial", "detail": "Tool output reached its byte limit"}
-    if timed_out:
-        return {"name": name, "status": "timeout", "output": text, "warnings": warnings}
-    if run.returncode:
-        return {"name": name, "status": "failed", "exit_code": run.returncode,
-                "detail": (warnings or text or f"Tool exited with code {run.returncode}")[-2000:]}
     result = {"name": name, "status": "completed", "output": text}
     if warnings:
         result["warnings"] = warnings
+    if not timed_out:
+        result["exit_code"] = run.returncode
+    if size > MAX_OUTPUT or error_size > MAX_OUTPUT:
+        # Preserve complete output lines already received, including detections.
+        if size > MAX_OUTPUT:
+            result["output"] = text[:text.rfind("\n") + 1]
+        result.update(status="partial", detail="Tool output reached its byte limit")
+        return result
+    if timed_out:
+        result["status"] = "timeout"
+        return result
+    if run.returncode:
+        result.update(status="failed", detail=f"Tool exited with code {run.returncode}")
     return result
 
 
@@ -60,13 +66,13 @@ def analyze(data):
         antivirus = run_tool("clamav", ["clamscan", "--no-summary", "--infected", "--stdout",
             "--max-filesize=32M", "--max-scansize=64M", "--max-files=1000", "--max-recursion=6",
             "--alert-exceeds-max=yes", "--alert-encrypted=yes", "--max-scantime=60000", str(path)], 90)
-        lines = (antivirus.get("detail", "") + "\n" + antivirus.get("output", "")).splitlines()
-        antivirus["detections"] = [line.split(": ", 1)[-1].removesuffix(" FOUND") for line in lines if line.endswith(" FOUND")]
-        if antivirus.get("exit_code") == 1:
-            antivirus["status"] = "completed" if antivirus["detections"] else "failed"
-            antivirus.pop("exit_code", None)
-        elif antivirus["status"] == "timeout" and antivirus["detections"]:
-            antivirus["status"] = "partial"
+        lines = antivirus.get("output", "").splitlines()
+        antivirus["detections"] = list(dict.fromkeys(line.split(": ", 1)[-1].removesuffix(" FOUND")
+            for line in lines if ": " in line and line.endswith(" FOUND")))
+        if antivirus["detections"]:
+            complete = (antivirus.get("exit_code") == 1 and antivirus["status"] not in {"partial", "timeout"}
+                        and not antivirus.get("warnings"))
+            antivirus["status"] = "completed" if complete else "partial"
         if any(value.startswith(("Heuristics.Limits.", "Heuristics.Encrypted.")) for value in antivirus["detections"]):
             antivirus["status"] = "partial"
         inventory = []
