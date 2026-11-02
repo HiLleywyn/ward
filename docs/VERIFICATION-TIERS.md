@@ -36,3 +36,7 @@ A future Verified result requires all Inspected checks plus:
 The [official REMnux virtual appliance guidance](https://docs.remnux.org/install-distro/get-virtual-appliance) is a suitable starting point. It provides prebuilt virtual-appliance formats and explicitly recommends verifying the download hash, updating the distro, and taking a snapshot. Ward still needs a separate controller, isolation policy, deterministic reset, and authenticated evidence protocol before it can safely automate that appliance.
 
 Containers alone do not satisfy the Verified boundary. Ward will not mount the Docker socket or execute untrusted repositories on its public web host.
+
+The [REMnux operator command](REMNUX.md) is available for deeper static file
+analysis in a disposable offline container. It reports tool outcomes and exact
+artifact/image digests. It does not issue Verified results or run sample code.

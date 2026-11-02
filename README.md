@@ -109,6 +109,10 @@ and duplicate records before advisory data is published.
 
 ## Check a downloaded file
 
+For deeper static file analysis using the official REMnux container, see
+[REMnux setup and usage](docs/REMNUX.md). The `ward remnux` operator command adds
+PE metadata and static capabilities without executing the sample.
+
 ```powershell
 ward file C:\Users\you\Downloads\suspicious.zip
 ```

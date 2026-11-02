@@ -55,6 +55,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     file_parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
 
+    remnux = subparsers.add_parser("remnux", help="run deeper static file analysis in an offline REMnux container")
+    remnux.add_argument("path", type=Path)
+    remnux.add_argument("--sha256", help="require this exact artifact hash before analysis")
+
     web = subparsers.add_parser("web", help="launch the local interactive checker")
     web.add_argument("--port", type=int, default=8787)
     web.add_argument("--no-open", action="store_true", help="do not open a browser automatically")
@@ -84,6 +88,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "remnux":
+            from .remnux import MAX_SAMPLE_BYTES, analyze_remnux
+            with args.path.open("rb") as sample:
+                data = sample.read(MAX_SAMPLE_BYTES + 1)
+            print(json.dumps(analyze_remnux(data, expected_sha256=args.sha256), indent=2))
+            return 0
         if args.command == "history":
             print(json.dumps(default_store().history(args.limit), indent=2))
             return 0
