@@ -162,13 +162,8 @@ def normalize_repository_url(value: str, *, resolve: bool = True) -> str:
     path = re.sub(r"/+", "/", parsed.path).rstrip("/")
     if not path or path == "/":
         raise ScanError("Repository URL must include a repository path")
-    if parsed.hostname.lower() == "git.lley.cat" and not re.fullmatch(
-        r"/r/[0-9a-fA-F-]{36}(?:\.git)?", path
-    ):
-        raise ScanError(
-            "git.lley.cat repository URLs use /r/<repository-id>.git. "
-            "Copy the clone URL from the repository page."
-        )
+    if parsed.hostname.lower() == "git.lley.cat" and not path.endswith(".git"):
+        path += ".git"
     return urlunparse(("https", parsed.hostname.lower(), path, "", "", ""))
 
 

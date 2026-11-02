@@ -37,18 +37,15 @@ class RepositoryUrlTests(unittest.TestCase):
             "https://git.example.org/team/project.git",
         )
 
-    def test_git_lley_friendly_path_explains_required_clone_url(self):
-        with self.assertRaisesRegex(ScanError, r"/r/<repository-id>\.git"):
-            normalize_repository_url("https://git.lley.cat/lleywyn/ward", resolve=False)
-
-        value = normalize_repository_url(
-            "https://git.lley.cat/r/b60252cb-df6f-478f-8cb7-d18f4cdd316b.git",
-            resolve=False,
-        )
-        self.assertEqual(
-            value,
-            "https://git.lley.cat/r/b60252cb-df6f-478f-8cb7-d18f4cdd316b.git",
-        )
+    def test_git_lley_human_and_stable_urls_gain_clone_suffix(self):
+        pairs = {
+            "https://git.lley.cat/lleywyn/ward": "https://git.lley.cat/lleywyn/ward.git",
+            "https://git.lley.cat/r/b60252cb-df6f-478f-8cb7-d18f4cdd316b":
+                "https://git.lley.cat/r/b60252cb-df6f-478f-8cb7-d18f4cdd316b.git",
+        }
+        for entered, expected in pairs.items():
+            with self.subTest(entered=entered):
+                self.assertEqual(normalize_repository_url(entered, resolve=False), expected)
 
     def test_credentials_and_private_networks_are_rejected(self):
         for value in (
