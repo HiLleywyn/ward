@@ -132,8 +132,11 @@ class WindowsPolicyTests(unittest.TestCase):
 
     def test_guest_collector_bounds_launch_and_defender_queries(self):
         guest = Path("src/ward/windows_guest.ps1").read_text(encoding="utf-8")
-        self.assertIn("Wait-Job -Job $launchJob -Timeout 20", guest)
-        self.assertIn("Wait-Job -Job $defenderJob -Timeout 10", guest)
+        self.assertIn("Invoke-CimMethod -ClassName Win32_Process", guest)
+        self.assertIn("-OperationTimeoutSec 20", guest)
+        self.assertIn("-OperationTimeoutSec 10", guest)
+        self.assertIn("$values.Count -lt 2000", guest)
+        self.assertIn("[IO.FileAttributes]::ReparsePoint", guest)
         self.assertIn("executed=$executed", guest)
 
     def test_only_explicit_sandbox_identifiers_are_used_for_teardown(self):

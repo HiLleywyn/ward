@@ -11,10 +11,24 @@ if ($digest -ne $request.sha256) { throw 'Artifact digest mismatch inside Window
 
 function Get-ProfileFiles {
     $values = @{}
-    Get-ChildItem -LiteralPath $env:USERPROFILE -File -Recurse -ErrorAction SilentlyContinue |
-        Select-Object -First 5000 | ForEach-Object {
-            $values[$_.FullName] = "$($_.Length):$($_.LastWriteTimeUtc.Ticks)"
+    $queue = New-Object 'System.Collections.Generic.Queue[string]'
+    foreach ($candidate in @($env:USERPROFILE, 'C:\Users\WDAGUtilityAccount') | Select-Object -Unique) {
+        if (Test-Path -LiteralPath $candidate -PathType Container) { $queue.Enqueue($candidate) }
+    }
+    $deadline = (Get-Date).AddSeconds(15)
+    while ($queue.Count -gt 0 -and $values.Count -lt 2000 -and (Get-Date) -lt $deadline) {
+        $directory = $queue.Dequeue()
+        foreach ($item in @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction SilentlyContinue)) {
+            if ($item.PSIsContainer) {
+                if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) {
+                    $queue.Enqueue($item.FullName)
+                }
+            } else {
+                $values[$item.FullName] = "$($item.Length):$($item.LastWriteTimeUtc.Ticks)"
+                if ($values.Count -ge 2000) { break }
+            }
         }
+    }
     return $values
 }
 function Get-RunKeys {
@@ -39,28 +53,19 @@ $launchError = $null
 try {
     $subscription = Register-CimIndicationEvent -Query 'SELECT * FROM Win32_ProcessStartTrace' -SourceIdentifier WardProcessStart
 } catch { $telemetryErrors += $_.Exception.Message }
-$launchJob = Start-Job -ScriptBlock {
-    param($SamplePath, $WorkingDirectory)
-    try {
-        $started = Start-Process -FilePath $SamplePath -WorkingDirectory $WorkingDirectory -PassThru -ErrorAction Stop
-        [pscustomobject]@{ id = [int]$started.Id; error = $null }
-    } catch {
-        [pscustomobject]@{ id = $null; error = $_.Exception.Message }
-    }
-} -ArgumentList $sample, $root
-if (Wait-Job -Job $launchJob -Timeout 20) {
-    $launchResult = Receive-Job -Job $launchJob
-    $launchError = $launchResult.error
-    if ($launchResult.id) {
-        $rootPid = [int]$launchResult.id
+try {
+    $launchResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+        CommandLine = '"' + $sample + '"'
+        CurrentDirectory = $root
+    } -OperationTimeoutSec 20 -ErrorAction Stop
+    if ($launchResult.ReturnValue -eq 0 -and $launchResult.ProcessId) {
+        $rootPid = [int]$launchResult.ProcessId
         $executed = $true
         $process = Get-Process -Id $rootPid -ErrorAction SilentlyContinue
+    } else {
+        $launchError = "Win32_Process.Create returned $($launchResult.ReturnValue)"
     }
-} else {
-    $launchError = 'Sample launch exceeded the 20 second limit'
-    Stop-Job -Job $launchJob -ErrorAction SilentlyContinue
-}
-Remove-Job -Job $launchJob -Force -ErrorAction SilentlyContinue
+} catch { $launchError = $_.Exception.Message }
 $deadline = (Get-Date).AddSeconds(60)
 if ($process) {
     while ((Get-Date) -lt $deadline) {
@@ -88,17 +93,11 @@ if ($rootPid) {
     }
 }
 $defender = @()
-$defenderJob = Start-Job -ScriptBlock {
-    Get-MpThreatDetection -ErrorAction Stop | Select-Object -First 20 ThreatID,InitialDetectionTime,ActionSuccess,Resources
-}
-if (Wait-Job -Job $defenderJob -Timeout 10) {
-    try { $defender = @(Receive-Job -Job $defenderJob -ErrorAction Stop) }
-    catch { $telemetryErrors += 'Windows Defender telemetry unavailable' }
-} else {
-    $telemetryErrors += 'Windows Defender telemetry exceeded the 10 second limit'
-    Stop-Job -Job $defenderJob -ErrorAction SilentlyContinue
-}
-Remove-Job -Job $defenderJob -Force -ErrorAction SilentlyContinue
+try {
+    $defender = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Defender' -ClassName MSFT_MpThreatDetection `
+        -OperationTimeoutSec 10 -ErrorAction Stop |
+        Select-Object -First 20 ThreatID,InitialDetectionTime,ActionSuccess,Resources)
+} catch { $telemetryErrors += 'Windows Defender telemetry unavailable or timed out' }
 $result = @{
     sha256=$digest
     executed=$executed

@@ -229,7 +229,7 @@ def handle_message(
             result = {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": {"tools": {"listChanged": False}, "resources": {"listChanged": False}},
-                "serverInfo": {"name": "ward", "version": "0.6.2"},
+                "serverInfo": {"name": "ward", "version": "0.6.3"},
                 "instructions": "Ward scans public Git repositories and hashes. Extended scans add isolated static analysis; Windows behavior is offered only when its disposable worker is verified online. Unknown never means safe.",
             }
         elif method == "ping":
