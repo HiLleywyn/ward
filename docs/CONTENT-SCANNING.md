@@ -35,8 +35,12 @@ validated analysis results into the current API verdict, website, and badge.
 README actions wait for analysis jobs and fail on partial analysis coverage.
 
 Text analysis is limited to 2 MiB per file; Python/Lua structural checks have
-smaller parser limits. In-process archive reading shares a 32 MiB expansion
-budget, 500 member limit, and depth limit of three. Links, traversal entries,
+smaller parser limits. Each root archive and its nested content share a 32 MiB
+expansion budget, 500-entry limit, and depth limit of three. All archives in one
+repository also share 64 MiB of expansion, 2,000 entries (including skipped
+entries), and 15 seconds of archive work. Time checks occur between members and
+stream-read chunks; they cannot interrupt an individual native decompressor or
+parser call. Reached limits leave explicit partial coverage. Links, traversal entries,
 encrypted members, malformed archives, unsupported formats, and reached limits
 are reported explicitly. LFS pointers and submodule definitions report missing
 external content. RAR/7z require the isolated engine for member scanning;

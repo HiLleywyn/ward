@@ -18,7 +18,7 @@ from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
 
 from .analyze import load_indicators, parse_repository_target
-from .archives import archive_kind, inspect_archive
+from .archives import ArchiveBudget, archive_kind, inspect_archive
 from .data import advisory_directory
 from .evidence import repository_warning
 from .source_rules import python_findings
@@ -400,6 +400,7 @@ def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=No
     file_count = total_bytes = hashed_bytes = text_files = archives = executable_files = 0
     truncated = False
     coverage_incomplete = False
+    archive_budget = ArchiveBudget()
     for path in sorted(root.rglob("*")):
         if ".git" in path.parts:
             continue
@@ -476,7 +477,8 @@ def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=No
         if archive_kind(prefix, relative) and size <= MAX_FILE_BYTES and not read_error:
             try:
                 archive_findings, archive_text, archive_count = inspect_archive(
-                    path.read_bytes(), relative, lambda data, location: _content_findings(data, location, known_hashes))
+                    path.read_bytes(), relative, lambda data, location: _content_findings(data, location, known_hashes),
+                    budget=archive_budget)
                 findings.extend(archive_findings)
                 text_files += archive_text
                 archives += archive_count
