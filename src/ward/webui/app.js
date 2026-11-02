@@ -91,7 +91,7 @@ function findingElement(finding) {
   return item;
 }
 
-function scanDetails(scan, expanded = false) {
+function scanDetails(scan, expanded = true) {
   const row = document.createElement('details');
   row.className = 'scan-record';
   row.open = expanded;
@@ -243,6 +243,7 @@ async function loadRecentScans() {
 function threatRow(item) {
   const row = document.createElement('details');
   row.className = 'threat-record';
+  row.open = true;
   const summary = document.createElement('summary');
   const date = textElement('time', '', formatDate(item.recorded_on));
   date.dateTime = item.recorded_on;
@@ -282,7 +283,7 @@ function threatRow(item) {
 }
 
 let threatRecords = [];
-const openFamilies = new Set();
+const collapsedFamilies = new Set();
 const familyPages = new Map();
 
 function familyPagination(family, page, pages) {
@@ -295,7 +296,7 @@ function familyPagination(family, page, pages) {
     button.disabled = disabled;
     button.addEventListener('click', () => {
       familyPages.set(family, target);
-      openFamilies.add(family);
+      collapsedFamilies.delete(family);
       renderKnownThreats();
       const active = [...knownThreats.querySelectorAll('.threat-family')].find(item => item.dataset.family === family);
       active?.querySelector('nav button:not(:disabled)')?.focus({preventScroll: true});
@@ -337,10 +338,10 @@ function renderKnownThreats() {
       const group = document.createElement('details');
       group.className = 'threat-family';
       group.dataset.family = family;
-      group.open = !!query || !!familyFilter || openFamilies.has(family);
+      group.open = !!query || !!familyFilter || !collapsedFamilies.has(family);
       group.addEventListener('toggle', () => {
         if (group.isConnected && !query && !familyFilter) {
-          if (group.open) openFamilies.add(family); else openFamilies.delete(family);
+          if (group.open) collapsedFamilies.delete(family); else collapsedFamilies.add(family);
         }
       });
       const summary = document.createElement('summary');
@@ -395,7 +396,7 @@ async function loadKnownThreats() {
 document.querySelector('#threat-filters').addEventListener('submit', event => event.preventDefault());
 document.querySelector('#threat-filters').addEventListener('input', () => { familyPages.clear(); renderKnownThreats(); });
 document.querySelector('#threat-filters').addEventListener('reset', () => {
-  openFamilies.clear();
+  collapsedFamilies.clear();
   familyPages.clear();
   setTimeout(renderKnownThreats, 0);
 });
