@@ -44,7 +44,7 @@ function escapeXml(value) {
 }
 
 check('browser JavaScript parses', () => {
-  const result = spawnSync(process.execPath, ['--check', path.join(root, 'src', 'emuwatch', 'webui', 'app.js')], {
+  const result = spawnSync(process.execPath, ['--check', path.join(root, 'src', 'ward', 'webui', 'app.js')], {
     encoding: 'utf8',
   });
   assert(result.status === 0, result.stderr.trim() || 'node --check failed');
@@ -52,15 +52,14 @@ check('browser JavaScript parses', () => {
 
 check('package version is consistent', () => {
   const project = read('pyproject.toml').match(/^version = "([^"]+)"/m)?.[1];
-  const module = read('src/emuwatch/__init__.py').match(/^__version__ = "([^"]+)"/m)?.[1];
-  assert(project && module && project === module, 'pyproject.toml and emuwatch.__version__ differ');
+  const module = read('src/ward/__init__.py').match(/^__version__ = "([^"]+)"/m)?.[1];
+  assert(project && module && project === module, 'pyproject.toml and ward.__version__ differ');
   const packaging = read('pyproject.toml');
-  assert(packaging.includes('ward = "emuwatch.cli:main"'), 'Ward CLI entry point is missing');
-  assert(packaging.includes('emuwatch = "emuwatch.cli:main"'), 'Legacy emuwatch CLI alias is missing');
+  assert(packaging.includes('ward = "ward.cli:main"'), 'Ward CLI entry point is missing');
 });
 
 check('advisory JSON is valid', () => {
-  const directory = path.join(root, 'src', 'emuwatch', 'advisories');
+  const directory = path.join(root, 'src', 'ward', 'advisories');
   const files = fs.readdirSync(directory).filter(name => name.endsWith('.json'));
   assert(files.length > 0, 'no advisory files were found');
   for (const file of files) {
@@ -70,7 +69,7 @@ check('advisory JSON is valid', () => {
 });
 
 check('confirmed indicators are exact and unique', () => {
-  const data = json('src/emuwatch/advisories/indicators.json');
+  const data = json('src/ward/advisories/indicators.json');
   const hashes = new Set();
   for (const item of data.indicators) {
     if (item.status !== 'confirmed') continue;
@@ -82,7 +81,7 @@ check('confirmed indicators are exact and unique', () => {
 });
 
 check('malware records are traceable and unique', () => {
-  const data = json('src/emuwatch/advisories/malware-records.json');
+  const data = json('src/ward/advisories/malware-records.json');
   const repositories = new Set();
   for (const item of data.records) {
     const key = item.repository.toLowerCase();
@@ -95,7 +94,7 @@ check('malware records are traceable and unique', () => {
 });
 
 check('homepage hierarchy stays compact', () => {
-  const page = read('src/emuwatch/webui/index.html');
+  const page = read('src/ward/webui/index.html');
   const scanner = page.indexOf('>Scanner<');
   const database = page.indexOf('>Malware Database<');
   const recent = page.indexOf('>Recent Scans<');
@@ -106,14 +105,14 @@ check('homepage hierarchy stays compact', () => {
 });
 
 check('scanner API wiring stays present', () => {
-  const script = read('src/emuwatch/webui/app.js');
+  const script = read('src/ward/webui/app.js');
   assert(script.includes('/api/v1/scans'), 'repository scan endpoint is missing');
   assert(script.includes('/api/scans'), 'recent scan endpoint is missing');
   assert(!script.includes('/api/campaigns'), 'standalone research feed returned');
 });
 
 check('OpenAPI contract covers implemented resources', () => {
-  const document = json('src/emuwatch/openapi.json');
+  const document = json('src/ward/openapi.json');
   assert(document.openapi === '3.1.0', 'OpenAPI must use version 3.1.0');
   for (const route of [
     '/api/v1/scans', '/api/v1/scans/{scan_id}', '/api/v1/scans/{scan_id}/events',
@@ -139,7 +138,7 @@ check('Ward plugin package is portable and secret-free', () => {
 });
 
 check('responsive accessibility styles stay present', () => {
-  const styles = read('src/emuwatch/webui/styles.css');
+  const styles = read('src/ward/webui/styles.css');
   assert(styles.includes('@media (max-width: 680px)'), 'mobile layout is missing');
   assert(styles.includes('@media (prefers-reduced-motion: reduce)'), 'reduced motion support is missing');
   assert(styles.includes('focus-visible'), 'keyboard focus styles are missing');

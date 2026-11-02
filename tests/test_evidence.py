@@ -2,13 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from emuwatch.analyze import assess_file, assess_repository, parse_repository_target
-from emuwatch.evidence import ResultStore, repository_warning
+from ward.analyze import assess_file, assess_repository, parse_repository_target
+from ward.evidence import ResultStore, repository_warning
 
 
 class EvidenceTests(unittest.TestCase):
     def test_renamed_repo_with_known_asset_digest_is_detected(self):
-        from emuwatch.github import RepositorySnapshot
+        from ward.github import RepositorySnapshot
         digest = 'a' * 64
         snapshot = RepositorySnapshot(
             {'full_name':'unrelated/tool','name':'tool','size':1000}, {},

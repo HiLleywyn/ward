@@ -10,7 +10,7 @@ from pathlib import Path
 
 from unittest.mock import patch
 
-from emuwatch.scanner import ScanError, _git_environment, inspect_tree, normalize_repository_url, scan_repository
+from ward.scanner import ScanError, _git_environment, inspect_tree, normalize_repository_url, scan_repository
 
 
 class RepositoryUrlTests(unittest.TestCase):
@@ -48,7 +48,7 @@ class RepositoryUrlTests(unittest.TestCase):
                 normalize_repository_url(value, resolve=False)
 
     def test_invalid_branch_names_are_rejected(self):
-        from emuwatch.scanner import normalize_git_ref
+        from ward.scanner import normalize_git_ref
         for value in ("--upload-pack=evil", "../main", "refs//heads/main", "main.lock"):
             with self.subTest(value=value), self.assertRaises(ScanError):
                 normalize_git_ref(value)
@@ -64,8 +64,8 @@ class RepositoryUrlTests(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0, "a" * 40 + "\n", "")
 
         address = (None, None, None, None, ("93.184.216.34", 443))
-        with patch("emuwatch.scanner.socket.getaddrinfo", return_value=[address]):
-            with patch("emuwatch.scanner.subprocess.run", side_effect=run):
+        with patch("ward.scanner.socket.getaddrinfo", return_value=[address]):
+            with patch("ward.scanner.subprocess.run", side_effect=run):
                 result = scan_repository("https://example.com/team/repository.git")
         self.assertEqual(result["status"], "Unverified")
         self.assertIn("http.curloptResolve=+example.com:443:93.184.216.34", commands[0])
@@ -78,8 +78,8 @@ class RepositoryUrlTests(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0, "a" * 40 + "\n", "")
 
         address = (None, None, None, None, ("93.184.216.34", 443))
-        with patch("emuwatch.scanner.socket.getaddrinfo", return_value=[address]):
-            with patch("emuwatch.scanner.subprocess.run", side_effect=run):
+        with patch("ward.scanner.socket.getaddrinfo", return_value=[address]):
+            with patch("ward.scanner.subprocess.run", side_effect=run):
                 with self.assertRaisesRegex(ScanError, "ref changed"):
                     scan_repository("https://example.com/team/repository.git", expected_commit="b" * 40)
 

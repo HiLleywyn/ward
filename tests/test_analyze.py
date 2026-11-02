@@ -7,8 +7,8 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from emuwatch.analyze import assess_file, assess_repository, parse_repository_target
-from emuwatch.github import RepositorySnapshot
+from ward.analyze import assess_file, assess_repository, parse_repository_target
+from ward.github import RepositorySnapshot
 
 
 NOW = datetime(2026, 11, 1, tzinfo=timezone.utc)

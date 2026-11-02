@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 
-WEB_ROOT = Path(__file__).parents[1] / "src" / "emuwatch" / "webui"
+WEB_ROOT = Path(__file__).parents[1] / "src" / "ward" / "webui"
 
 
 class WebInterfaceTests(unittest.TestCase):

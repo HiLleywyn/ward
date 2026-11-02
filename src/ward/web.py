@@ -26,7 +26,7 @@ WEB_ROOT = Path(__file__).with_name("webui")
 
 
 def _handler() -> type[BaseHTTPRequestHandler]:
-    public = os.environ.get("EMUWATCH_PUBLIC") == "1"
+    public = os.environ.get("WARD_PUBLIC") == "1"
     client = GitHubClient()
     if public:
         client.token = None
@@ -567,7 +567,7 @@ class BoundedHTTPServer(ThreadingHTTPServer):
 def serve(port: int = 8787, open_browser: bool = True) -> None:
     if not 1 <= port <= 65535:
         raise ValueError("port must be between 1 and 65535")
-    address = ("0.0.0.0" if os.environ.get("EMUWATCH_PUBLIC") == "1" else "127.0.0.1", port)
+    address = ("0.0.0.0" if os.environ.get("WARD_PUBLIC") == "1" else "127.0.0.1", port)
     server = BoundedHTTPServer(address, _handler())
     url = f"http://127.0.0.1:{port}"
     print(f"Ward is ready at {url}")

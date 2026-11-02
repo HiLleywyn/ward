@@ -1,6 +1,6 @@
 import unittest
 
-from emuwatch.cli import build_parser
+from ward.cli import build_parser
 
 
 class WardCliTests(unittest.TestCase):

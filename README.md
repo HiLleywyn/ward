@@ -115,23 +115,23 @@ ward file C:\Users\you\Downloads\suspicious.zip
 ```
 
 The file stays on your machine. The tool calculates SHA-256 locally and checks
-it against `src/emuwatch/advisories/indicators.json`. A negative result only means the hash
+it against `src/ward/advisories/indicators.json`. A negative result only means the hash
 is not currently in this small registry.
 
 The checker also recognizes a small set of project-release assets in
-`src/emuwatch/advisories/known-project-assets.json`. That can confirm where an exact file
+`src/ward/advisories/known-project-assets.json`. That can confirm where an exact file
 came from, but it still does not guarantee that the file is safe.
 
 ## Current advisory status
 
-News and threat research are kept in `src/emuwatch/advisories/campaigns.json`.
+News and threat research are kept in `src/ward/advisories/campaigns.json`.
 The initial PS5 campaign has no confirmed PS5 repository or hash indicators.
 Repository-specific malware records are stored separately in
-`src/emuwatch/advisories/malware-records.json`; campaign coverage alone is not
+`src/ward/advisories/malware-records.json`; campaign coverage alone is not
 enough to enter that database.
 
 Known project locations are listed separately in
-`src/emuwatch/advisories/project-locations.json`. They are identity anchors, not blanket
+`src/ward/advisories/project-locations.json`. They are identity anchors, not blanket
 safety guarantees.
 
 ## If you already ran a suspicious download
@@ -194,6 +194,4 @@ The legacy GitHub metadata endpoint is cached for 15 minutes and capped at eight
 fresh checks per hour. Local file hashing remains CLI-only.
 
 Maintained by Lleywyn. No analytics or advertising scripts are included.
-
-`emuwatch` remains available as a legacy command alias for existing scripts.
 

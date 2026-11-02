@@ -31,7 +31,7 @@ class APIError(Exception):
 
 
 def openapi_document() -> dict:
-    return json.loads(files("emuwatch").joinpath("openapi.json").read_text(encoding="utf-8"))
+    return json.loads(files("ward").joinpath("openapi.json").read_text(encoding="utf-8"))
 
 
 def normalize_sha256(value: object) -> str:

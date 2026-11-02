@@ -7,13 +7,13 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from emuwatch.web import BoundedHTTPServer, _handler
+from ward.web import BoundedHTTPServer, _handler
 
 
 class PublicWebTests(unittest.TestCase):
     def test_public_history_hidden_and_known_warning_works_without_github(self):
-        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'EMUWATCH_PUBLIC':'1','EMUWATCH_STATE_DIR':temp}):
-            with patch('emuwatch.web.GitHubClient.snapshot', side_effect=AssertionError('No live call expected')):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'WARD_PUBLIC':'1','WARD_STATE_DIR':temp}):
+            with patch('ward.web.GitHubClient.snapshot', side_effect=AssertionError('No live call expected')):
                 server = BoundedHTTPServer(('127.0.0.1',0), _handler())
                 thread = threading.Thread(target=server.serve_forever, daemon=True)
                 thread.start()
@@ -59,9 +59,9 @@ class PublicWebTests(unittest.TestCase):
             'sources': [],
             'limitations': ['No match does not prove safety.'],
         }
-        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'EMUWATCH_PUBLIC':'1','EMUWATCH_STATE_DIR':temp}):
-            with patch('emuwatch.web.normalize_repository_url', return_value='https://github.com/owner/repository.git'):
-                with patch('emuwatch.web.scan_repository', return_value=result):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'WARD_PUBLIC':'1','WARD_STATE_DIR':temp}):
+            with patch('ward.web.normalize_repository_url', return_value='https://github.com/owner/repository.git'):
+                with patch('ward.web.scan_repository', return_value=result):
                     server = BoundedHTTPServer(('127.0.0.1',0), _handler())
                     thread = threading.Thread(target=server.serve_forever, daemon=True)
                     thread.start()

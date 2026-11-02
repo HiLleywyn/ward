@@ -35,7 +35,7 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -v
       - name: Validate advisory registry
-        run: python -m emuwatch validate
+        run: python -m ward validate
       - name: Compile Python sources
         run: python -m compileall -q src
 
@@ -51,7 +51,7 @@ jobs:
         with:
           node-version: "22"
       - name: Check browser JavaScript
-        run: node --check src/emuwatch/webui/app.js
+        run: node --check src/ward/webui/app.js
       - name: Run Ward integrity checks
         run: node tools/ci-check.mjs
 
@@ -66,5 +66,5 @@ jobs:
         run: docker build --tag ward-ci .
       - name: Verify installed package and non-root user
         run: |
-          docker run --rm --entrypoint python ward-ci -c "import emuwatch; from importlib.metadata import version; assert emuwatch.__version__ == version('ward-github-scanner')"
+          docker run --rm --entrypoint python ward-ci -c "import ward; from importlib.metadata import version; assert ward.__version__ == version('ward-github-scanner')"
           test "$(docker run --rm --entrypoint id ward-ci -u)" = "10001"

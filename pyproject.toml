@@ -13,8 +13,7 @@ authors = [{ name = "HiLleywyn" }]
 dependencies = []
 
 [project.scripts]
-ward = "emuwatch.cli:main"
-emuwatch = "emuwatch.cli:main"
+ward = "ward.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -23,5 +22,5 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-emuwatch = ["webui/*", "advisories/*.json", "openapi.json"]
+ward = ["webui/*", "advisories/*.json", "openapi.json"]
 

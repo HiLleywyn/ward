@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from emuwatch.discovery import hunt_project, project_queries
-from emuwatch.github import RepositorySnapshot
+from ward.discovery import hunt_project, project_queries
+from ward.github import RepositorySnapshot
 
 
 class FakeClient:

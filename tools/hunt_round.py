@@ -6,9 +6,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-from emuwatch.analyze import assess_repository
-from emuwatch.evidence import default_store, reviewed_repositories, snapshot_evidence
-from emuwatch.github import GitHubClient, GitHubError
+from ward.analyze import assess_repository
+from ward.evidence import default_store, reviewed_repositories, snapshot_evidence
+from ward.github import GitHubClient, GitHubError
 
 
 def inspect(client, repo):

@@ -10,10 +10,10 @@ reviewed test with a stated revision and scope, such as provenance verification.
 It never means software is guaranteed safe.
 
 The machine-readable source of this record is
-[repositories.json](../src/emuwatch/advisories/repositories.json).
+[repositories.json](../src/ward/advisories/repositories.json).
 The local interface displays it alongside recent observations. Every scan and
-community lead is appended to a local SQLite history at `.emuwatch` in your
-user directory. Set `EMUWATCH_STATE_DIR` to select another location.
+community lead is appended to a local SQLite history at `.ward` in your
+user directory. Set `WARD_STATE_DIR` to select another location.
 
 | Result | Campaign | Named repositories | Primary report |
 | --- | --- | ---: | --- |
@@ -21,7 +21,7 @@ user directory. Set `EMUWATCH_STATE_DIR` to select another location.
 | FAIL | Webrat fake exploits | 15 | [Kaspersky](https://securelist.com/webrat-distributed-via-github/118555/) |
 | FAIL | GitVenom | 1 | [Kaspersky](https://securelist.com/gitvenom-campaign/115694/) |
 | FAIL | Yoba fake AI apps | 4 | [Check Point](https://research.checkpoint.com/2026/tricks-from-the-past-deployed-via-signed-chatgpt-and-claude-binaries/) |
-| UNKNOWN | PS5 impersonation | 0 confirmed in this investigation | [Reported campaign](../src/emuwatch/advisories/campaigns.json) |
+| UNKNOWN | PS5 impersonation | 0 confirmed in this investigation | [Reported campaign](../src/ward/advisories/campaigns.json) |
 
 These campaigns have different sources and timelines. No relationship between
 the PS5 operation and the other campaigns has been established.

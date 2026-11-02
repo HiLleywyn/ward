@@ -5,12 +5,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from emuwatch.registry import validate_registry
+from ward.registry import validate_registry
 
 
 class RegistryTests(unittest.TestCase):
     def test_project_registry_is_valid(self):
-        from emuwatch.data import advisory_directory
+        from ward.data import advisory_directory
         directory = advisory_directory()
         self.assertEqual(validate_registry(directory), [])
 

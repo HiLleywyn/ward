@@ -473,7 +473,7 @@ class ResultStore:
 
 def default_store() -> ResultStore:
     import os
-    base = Path(os.environ.get("EMUWATCH_STATE_DIR", Path.home() / ".emuwatch"))
+    base = Path(os.environ.get("WARD_STATE_DIR", Path.home() / ".ward"))
     return ResultStore(base / "results.sqlite3")
 
 

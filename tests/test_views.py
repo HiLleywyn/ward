@@ -1,6 +1,6 @@
 import unittest
 
-from emuwatch.views import badge_state
+from ward.views import badge_state
 
 
 class BadgeStateTests(unittest.TestCase):

@@ -11,15 +11,15 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from emuwatch.api import openapi_document
-from emuwatch.evidence import ResultStore
-from emuwatch.web import BoundedHTTPServer, _handler
+from ward.api import openapi_document
+from ward.evidence import ResultStore
+from ward.web import BoundedHTTPServer, _handler
 
 
 class WardAPITests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.environment = patch.dict(os.environ, {"EMUWATCH_PUBLIC": "1", "EMUWATCH_STATE_DIR": self.temp.name})
+        self.environment = patch.dict(os.environ, {"WARD_PUBLIC": "1", "WARD_STATE_DIR": self.temp.name})
         self.environment.start()
         self.server = BoundedHTTPServer(("127.0.0.1", 0), _handler())
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -53,7 +53,7 @@ class WardAPITests(unittest.TestCase):
 
     def test_hash_lifecycle_idempotency_report_and_public_artifact(self):
         indicator = json.loads(
-            (Path(__file__).parents[1] / "src/emuwatch/advisories/indicators.json").read_text(encoding="utf-8")
+            (Path(__file__).parents[1] / "src/ward/advisories/indicators.json").read_text(encoding="utf-8")
         )["indicators"][0]
         status, headers, job = self.request(
             "/api/v1/scans", method="POST",
@@ -189,8 +189,8 @@ class WardAPITests(unittest.TestCase):
             return value if value.endswith(".git") else value + ".git"
 
         scan_ids = []
-        with patch("emuwatch.api.normalize_repository_url", side_effect=normalized):
-            with patch("emuwatch.api.scan_repository", side_effect=results):
+        with patch("ward.api.normalize_repository_url", side_effect=normalized):
+            with patch("ward.api.scan_repository", side_effect=results):
                 for url, ref in (
                     ("https://github.com/owner/repo", "main"),
                     ("https://github.com/owner/repo", "feature"),
