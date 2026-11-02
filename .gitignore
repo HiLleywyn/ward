@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+reports/
 .local/
 *.sqlite3
 *.sqlite3-*

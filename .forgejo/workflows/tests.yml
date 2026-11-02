@@ -52,6 +52,8 @@ jobs:
           node-version: "22"
       - name: Check browser JavaScript
         run: node --check src/emuwatch/webui/app.js
+      - name: Run Ward integrity checks
+        run: node tools/ci-check.mjs
 
   container:
     name: Container build
