@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import tempfile
@@ -9,7 +10,7 @@ from unittest.mock import patch
 from ward.analysis import result_digest
 from ward.api import report_for_job
 from ward.evidence import ResultStore
-from ward.windows import _guest_command, _sandbox_id, sandbox_config
+from ward.windows import _encrypt_payload, _guest_command, _sandbox_id, sandbox_config
 from ward.windows_worker import CREATE_NO_WINDOW, bridge
 
 
@@ -125,10 +126,20 @@ class WindowsPolicyTests(unittest.TestCase):
 
     def test_guest_collector_is_explicitly_executed_as_system(self):
         sandbox_id = "01234567-1234-1234-1234-0123456789ab"
-        command = _guest_command("wsb.exe", sandbox_id)
+        command = _guest_command("wsb.exe", sandbox_id, "a" * 88)
         self.assertEqual(command[:4], ["wsb.exe", "exec", "--id", sandbox_id])
         self.assertEqual(command[command.index("--run-as") + 1], "System")
         self.assertIn(r"C:\WardInput\collect.ps1", command[command.index("--command") + 1])
+
+    def test_host_staging_contains_authenticated_ciphertext_not_decodable_base64(self):
+        data = b"MZ harmless control fixture"
+        digest = hashlib.sha256(data).hexdigest()
+        ciphertext, request, key_material = _encrypt_payload(data, digest)
+        self.assertNotIn(data, ciphertext)
+        self.assertEqual(request["scheme"], "aes-256-cbc+hmac-sha256")
+        self.assertEqual(request["sha256"], digest)
+        self.assertNotIn("content_base64", request)
+        self.assertEqual(len(base64.b64decode(key_material)), 64)
 
     def test_guest_collector_bounds_launch_and_defender_queries(self):
         guest = Path("src/ward/windows_guest.ps1").read_text(encoding="utf-8")

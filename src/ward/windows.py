@@ -14,6 +14,9 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
 
+from cryptography.hazmat.primitives import hashes, hmac, padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 from .analysis import result_digest
 from .remnux import MAX_SAMPLE_BYTES
 
@@ -60,11 +63,33 @@ def _sandbox_id(value):
     return None
 
 
-def _guest_command(executable: str, sandbox_id: str) -> list[str]:
+def _encrypt_payload(data: bytes, expected_sha256: str) -> tuple[bytes, dict, str]:
+    key_material = os.urandom(64)
+    encryption_key, mac_key = key_material[:32], key_material[32:]
+    iv = os.urandom(16)
+    padder = padding.PKCS7(algorithms.AES.block_size).padder()
+    padded = padder.update(data) + padder.finalize()
+    encryptor = Cipher(algorithms.AES(encryption_key), modes.CBC(iv)).encryptor()
+    ciphertext = encryptor.update(padded) + encryptor.finalize()
+    signer = hmac.HMAC(mac_key, hashes.SHA256())
+    signer.update(iv + ciphertext)
+    metadata = {
+        "scheme": "aes-256-cbc+hmac-sha256",
+        "sha256": expected_sha256,
+        "iv_base64": base64.b64encode(iv).decode(),
+        "tag_base64": base64.b64encode(signer.finalize()).decode(),
+    }
+    return ciphertext, metadata, base64.b64encode(key_material).decode()
+
+
+def _guest_command(executable: str, sandbox_id: str, key_material: str) -> list[str]:
     # The unattended worker has no active guest login, so ExistingLogin cannot run the collector.
     return [
         executable, "exec", "--id", sandbox_id,
-        "--command", r"powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\WardInput\collect.ps1",
+        "--command", (
+            r"powershell.exe -NoProfile -ExecutionPolicy Bypass "
+            rf"-File C:\WardInput\collect.ps1 -KeyMaterial {key_material}"
+        ),
         "--run-as", "System", "--raw",
     ]
 
@@ -84,8 +109,10 @@ def analyze_windows(
         inputs, outputs = root / "input", root / "output"
         inputs.mkdir()
         outputs.mkdir()
+        ciphertext, request, key_material = _encrypt_payload(data, expected_sha256)
         (inputs / "collect.ps1").write_text(Path(__file__).with_name("windows_guest.ps1").read_text(encoding="utf-8"), encoding="utf-8")
-        (inputs / "request.json").write_text(json.dumps({"sha256": expected_sha256, "content_base64": base64.b64encode(data).decode()}), encoding="utf-8")
+        (inputs / "sample.enc").write_bytes(ciphertext)
+        (inputs / "request.json").write_text(json.dumps(request), encoding="utf-8")
         # Refuse to attach to or stop a sandbox that belongs to another task.
         existing = subprocess.run(
             [executable, "list", "--raw"], capture_output=True, text=True,
@@ -105,7 +132,7 @@ def analyze_windows(
         execution = None
         try:
             execution = subprocess.Popen(
-                _guest_command(executable, sandbox_id),
+                _guest_command(executable, sandbox_id, key_material),
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                 creationflags=CREATE_NO_WINDOW,
             )

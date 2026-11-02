@@ -10,7 +10,7 @@ than silently downgrading them.
 
 - Windows Sandbox is started for one artifact and stopped after the bounded run.
 - Networking, clipboard, GPU, audio, video, and printer redirection are disabled.
-- The input mapping is job-specific and read-only.
+- The input mapping is job-specific and read-only. Artifact bytes are staged as authenticated ciphertext; the one-time key is passed only to the disposable guest command.
 - The output mapping is job-specific, monitored, and limited to bounded JSON telemetry.
 - No personal folder, credential, browser profile, USB device, or service secret is mapped.
 - Ward refuses to attach to or stop a Sandbox instance it did not create.

@@ -1,10 +1,45 @@
+param(
+    [Parameter(Mandatory=$true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$KeyMaterial
+)
 $ErrorActionPreference = 'Stop'
 $Error.Clear()
 $request = Get-Content -LiteralPath 'C:\WardInput\request.json' -Raw | ConvertFrom-Json
 $root = Join-Path $env:TEMP 'WardSample'
 New-Item -ItemType Directory -Path $root -Force | Out-Null
 $sample = Join-Path $root 'sample.exe'
-$bytes = [Convert]::FromBase64String($request.content_base64)
+$keyBytes = [Convert]::FromBase64String($KeyMaterial)
+if ($keyBytes.Length -ne 64) { throw 'Invalid artifact key material' }
+$encryptionKey = New-Object byte[] 32
+$macKey = New-Object byte[] 32
+[Array]::Copy($keyBytes, 0, $encryptionKey, 0, 32)
+[Array]::Copy($keyBytes, 32, $macKey, 0, 32)
+$iv = [Convert]::FromBase64String($request.iv_base64)
+$expectedTag = [Convert]::FromBase64String($request.tag_base64)
+$ciphertext = [IO.File]::ReadAllBytes('C:\WardInput\sample.enc')
+$authenticated = New-Object byte[] ($iv.Length + $ciphertext.Length)
+[Array]::Copy($iv, 0, $authenticated, 0, $iv.Length)
+[Array]::Copy($ciphertext, 0, $authenticated, $iv.Length, $ciphertext.Length)
+$hmac = New-Object System.Security.Cryptography.HMACSHA256
+$hmac.Key = $macKey
+$actualTag = $hmac.ComputeHash($authenticated)
+$tagDifference = 0
+if ($actualTag.Length -ne $expectedTag.Length) { throw 'Artifact authentication failed' }
+for ($index = 0; $index -lt $actualTag.Length; $index++) {
+    $tagDifference = $tagDifference -bor ($actualTag[$index] -bxor $expectedTag[$index])
+}
+if ($tagDifference -ne 0) { throw 'Artifact authentication failed' }
+$aes = [Security.Cryptography.Aes]::Create()
+$aes.Key = $encryptionKey
+$aes.IV = $iv
+$aes.Mode = [Security.Cryptography.CipherMode]::CBC
+$aes.Padding = [Security.Cryptography.PaddingMode]::PKCS7
+$decryptor = $aes.CreateDecryptor()
+$bytes = $decryptor.TransformFinalBlock($ciphertext, 0, $ciphertext.Length)
+$decryptor.Dispose()
+$aes.Dispose()
+$hmac.Dispose()
 [IO.File]::WriteAllBytes($sample, $bytes)
 $digest = (Get-FileHash -LiteralPath $sample -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($digest -ne $request.sha256) { throw 'Artifact digest mismatch inside Windows Sandbox' }
