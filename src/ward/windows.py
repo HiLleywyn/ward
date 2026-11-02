@@ -157,6 +157,7 @@ def analyze_windows(
                 "Offline execution can prevent later stages from running. It cannot prove software safe.",
                 "Guest telemetry can be incomplete or tampered with; profile changes can include background Windows activity.",
                 "File-change coverage is limited to selected top-level user and ProgramData locations.",
+                "Windows Defender telemetry is not collected by the bounded guest profile.",
                 "Input is read-only; the only writable host mapping is this job's isolated, size-monitored result directory.",
                 "This run does not satisfy Ward's reserved Verified tier or independently authenticate guest telemetry.",
             ],

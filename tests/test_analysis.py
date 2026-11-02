@@ -134,10 +134,12 @@ class WindowsPolicyTests(unittest.TestCase):
         guest = Path("src/ward/windows_guest.ps1").read_text(encoding="utf-8")
         self.assertIn("Invoke-CimMethod -ClassName Win32_Process", guest)
         self.assertIn("-OperationTimeoutSec 20", guest)
-        self.assertIn("-OperationTimeoutSec 10", guest)
+        self.assertIn("Get-CimInstance -ClassName Win32_Process", guest)
+        self.assertIn("-OperationTimeoutSec 2", guest)
         self.assertIn("Select-Object -First 500", guest)
         self.assertNotIn("-Recurse", guest)
-        self.assertIn("-MaxEvents 100", guest)
+        self.assertNotIn("Register-CimIndicationEvent", guest)
+        self.assertNotIn("Get-Event", guest)
         self.assertIn("executed=$executed", guest)
 
     def test_only_explicit_sandbox_identifiers_are_used_for_teardown(self):

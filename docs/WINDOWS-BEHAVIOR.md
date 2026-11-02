@@ -17,9 +17,10 @@ than silently downgrading them.
 - The unattended controller uses the headless `wsb` CLI and suppresses host console windows.
 
 The guest runs for at most 60 seconds inside a 180-second outer deadline. It
-records process starts, selected top-level profile file changes, startup
-registry keys, and Defender detections. Offline execution can prevent later stages from
-running. Guest telemetry can be incomplete or altered by the sample.
+records bounded process snapshots, selected top-level profile file changes,
+and startup registry keys. Offline execution can prevent later stages from
+running. Guest telemetry can be incomplete or altered by the sample. The bounded
+profile does not collect Windows Defender telemetry.
 
 ## Host setup
 
