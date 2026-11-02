@@ -13,6 +13,8 @@ Every hosted run creates a fresh virtual environment, installs Ward and its
 declared dependencies from `pyproject.toml`, and runs `pip check` before the
 tests. The only external HTTPS destinations are `pypi.org` and
 `files.pythonhosted.org`. No credentials are needed for dependency downloads.
+The HTTP test clients connect directly to their own loopback servers, independent
+of the runner's download proxy.
 
 The Python test runner writes `reports/python.xml`; the web integrity checks
 write `reports/ci.xml`. Both reports feed the Tests page. Dependency installation

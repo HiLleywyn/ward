@@ -5,9 +5,12 @@ import threading
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 from ward.web import BoundedHTTPServer, _handler
+
+# This test client addresses only loopback fixture servers, never external URLs.
+urlopen = build_opener(ProxyHandler({})).open
 
 
 class PublicWebTests(unittest.TestCase):
