@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import {spawnSync} from 'node:child_process';
 
 const root = process.cwd();
 const cases = [];
@@ -41,6 +42,13 @@ function escapeXml(value) {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&apos;');
 }
+
+check('browser JavaScript parses', () => {
+  const result = spawnSync(process.execPath, ['--check', path.join(root, 'src', 'emuwatch', 'webui', 'app.js')], {
+    encoding: 'utf8',
+  });
+  assert(result.status === 0, result.stderr.trim() || 'node --check failed');
+});
 
 check('package version is consistent', () => {
   const project = read('pyproject.toml').match(/^version = "([^"]+)"/m)?.[1];
