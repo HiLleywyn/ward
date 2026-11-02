@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import {spawnSync} from 'node:child_process';
+import vm from 'node:vm';
 
 const root = process.cwd();
 const cases = [];
@@ -48,6 +49,54 @@ check('browser JavaScript parses', () => {
     encoding: 'utf8',
   });
   assert(result.status === 0, result.stderr.trim() || 'node --check failed');
+});
+
+function evidenceRenderers() {
+  class Element {
+    constructor(tagName) { this.tagName = tagName; this.children = []; }
+    set textContent(value) { this.children = [{textContent: String(value ?? '')}]; }
+    get textContent() { return this.children.map(child => child.textContent).join(''); }
+    set innerHTML(value) { throw new Error('Evidence must never be parsed as HTML'); }
+    append(...children) { this.children.push(...children); }
+  }
+  const script = read('src/ward/webui/app.js');
+  const start = script.indexOf('function textElement(');
+  const end = script.indexOf('function findingElement(');
+  assert(start >= 0 && end > start, 'record rendering helpers are missing');
+  return vm.runInNewContext(`${script.slice(start, end)}\n({evidenceText, familyGuidance})`, {
+    document: {createElement: tag => new Element(tag), createTextNode: text => ({textContent: text})},
+  });
+}
+
+check('evidence preserves text and safely formats technical values', () => {
+  const {evidenceText} = evidenceRenderers();
+  const hash = 'd3b73a54c8f4825bb10974799ba9674ee41863f8c73e6a059f9206258026d32b';
+  const text = `Installer.rar hashes to ${hash}; chacha20_xor writes LOCALAPPDATA\\Microsoft\\Windows\\Update\\rt. <img src=x onerror=alert(1)>`;
+  const result = evidenceText('p', '', text);
+  assert(result.textContent === text, 'rendering changed or truncated evidence');
+  const codes = result.children.filter(child => child.tagName === 'code');
+  for (const token of [hash, 'Installer.rar', 'chacha20_xor', 'LOCALAPPDATA\\Microsoft\\Windows\\Update\\rt']) {
+    assert(codes.some(child => child.textContent === token), `technical value is not code: ${token}`);
+  }
+  assert(codes.find(child => child.textContent === hash).tabIndex === 0, 'long hashes must be keyboard accessible');
+  assert(result.children.every(child => !child.tagName || child.tagName === 'code'), 'untrusted text became markup');
+  assert(evidenceText('p', '', 'Use `gpo_open` here.').textContent === 'Use gpo_open here.', 'explicit inline code is not supported');
+  assert(evidenceText('p', '', 'Incomplete `markup').textContent === 'Incomplete `markup', 'incomplete markup lost text');
+});
+
+check('parent guidance deduplicates shared text and preserves scoped variants', () => {
+  const {familyGuidance} = evidenceRenderers();
+  const records = [
+    {repository: 'owner/one', symptoms: 'Unexpected elevation.', remediation: 'Preserve evidence.'},
+    {repository: 'owner/two', symptoms: 'Unexpected elevation.', remediation: 'Preserve evidence.'},
+    {repository: 'owner/three', symptoms: 'Unexpected elevation.', remediation: 'Inspect the scheduled task.'},
+  ];
+  const result = familyGuidance(records);
+  assert(result.children.filter(child => child.tagName === 'h4').map(child => child.textContent).join('|') === 'Symptoms|Remediation', 'parent section labels are incorrect');
+  assert(result.children.filter(child => child.textContent === 'Unexpected elevation.').length === 1, 'shared symptoms were duplicated');
+  assert(result.children.filter(child => child.textContent === 'Preserve evidence.').length === 1, 'shared remediation was duplicated');
+  assert(result.textContent.includes('Inspect the scheduled task.'), 'a remediation variant was lost');
+  assert(result.textContent.includes('owner/one, owner/two') && result.textContent.includes('owner/three'), 'variant scope was lost');
 });
 
 check('package version is consistent', () => {

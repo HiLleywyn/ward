@@ -67,6 +67,38 @@ function textElement(tag, className, text) {
   return element;
 }
 
+function evidenceText(tag, className, value) {
+  const element = textElement(tag, className, '');
+  const text = String(value ?? '');
+  const tokens = /`[^`\n]+`|\b(?:[a-f0-9]{128}|[a-f0-9]{64}|[a-f0-9]{40}|[a-f0-9]{32})\b|\b[A-Za-z_]\w*(?:\\[\w.$-]*[\w$-])+|\b[\w.-]+\.(?:exe|dll|rar|zip|aes|key|ps1|bat|cmd|js|py|json)\b|\b[A-Za-z]\w*_\w+\b/gi;
+  let end = 0;
+  for (const match of text.matchAll(tokens)) {
+    element.append(document.createTextNode(text.slice(end, match.index)));
+    const code = textElement('code', '', match[0].startsWith('`') ? match[0].slice(1, -1) : match[0]);
+    if (code.textContent.length >= 32) code.tabIndex = 0;
+    element.append(code);
+    end = match.index + match[0].length;
+  }
+  element.append(document.createTextNode(text.slice(end)));
+  return element;
+}
+
+function familyGuidance(records) {
+  const section = document.createElement('div');
+  section.className = 'remediation';
+  for (const [field, label] of [['symptoms', 'Symptoms'], ['remediation', 'Remediation']]) {
+    section.append(textElement('h4', '', label));
+    const descriptions = [...new Set(records.map(item => item[field]).filter(Boolean))];
+    for (const description of descriptions) {
+      if (descriptions.length > 1) {
+        section.append(textElement('p', 'guidance-scope', records.filter(item => item[field] === description).map(item => item.repository).join(', ')));
+      }
+      section.append(evidenceText('p', '', description));
+    }
+  }
+  return section;
+}
+
 function findingElement(finding) {
   const item = document.createElement('li');
   item.className = `finding severity-${finding.severity}`;
@@ -77,7 +109,7 @@ function findingElement(finding) {
     textElement('span', 'severity', finding.severity),
   );
   const location = textElement('code', 'finding-path', `${finding.path}${finding.line ? `:${finding.line}` : ''}`);
-  const detail = textElement('p', '', finding.detail);
+  const detail = evidenceText('p', '', finding.detail);
   item.append(heading, location, detail);
   if (finding.sha256) item.append(textElement('code', 'finding-hash', `SHA-256 ${finding.sha256}`));
   if (finding.source_url) {
@@ -91,7 +123,7 @@ function findingElement(finding) {
   return item;
 }
 
-function scanDetails(scan, expanded = true) {
+function scanDetails(scan, expanded = false) {
   const row = document.createElement('details');
   row.className = 'scan-record';
   row.open = expanded;
@@ -243,7 +275,6 @@ async function loadRecentScans() {
 function threatRow(item) {
   const row = document.createElement('details');
   row.className = 'threat-record';
-  row.open = true;
   const summary = document.createElement('summary');
   const date = textElement('time', '', formatDate(item.recorded_on));
   date.dateTime = item.recorded_on;
@@ -259,8 +290,9 @@ function threatRow(item) {
   location.className = 'evidence-first';
   location.append(
     textElement('span', 'field-label', 'affected file'),
-    textElement('code', '', `${item.release} · ${item.malicious_path}`),
-    textElement('p', '', item.finding),
+    evidenceText('p', 'evidence-location', item.release),
+    textElement('code', 'affected-path', item.malicious_path),
+    evidenceText('p', '', item.finding),
   );
   const actions = document.createElement('div');
   actions.className = 'record-actions';
@@ -268,16 +300,7 @@ function threatRow(item) {
   evidence.href = `/api/record?repository=${encodeURIComponent(item.repository)}`;
   evidence.textContent = 'View evidence';
   actions.append(evidence);
-  const help = document.createElement('details');
-  help.className = 'remediation';
-  help.append(textElement('summary', '', 'Symptoms and cleanup'));
-  help.append(
-    textElement('h4', '', 'Symptoms'),
-    textElement('p', '', item.symptoms),
-    textElement('h4', '', 'Recommended action'),
-    textElement('p', '', item.remediation),
-  );
-  body.append(location, actions, help);
+  body.append(location, actions);
   row.append(summary, body);
   return row;
 }
@@ -349,7 +372,7 @@ function renderKnownThreats() {
       summary.append(textElement('h3', '', family), textElement('span', 'record-count', `${records.length} ${records.length === 1 ? 'repository' : 'repositories'}`), icon('chevron-down', 'chevron'));
       const header = document.createElement('div');
       header.className = 'family-intro';
-      const description = textElement('p', '', records[0].behavior);
+      const description = evidenceText('p', '', records[0].behavior);
       const links = document.createElement('div');
       links.className = 'family-links';
       const source = document.createElement('a');
@@ -361,7 +384,7 @@ function renderKnownThreats() {
       database.rel = 'noreferrer';
       database.textContent = records[0].malware_db_name;
       links.append(source, database);
-      header.append(description, links);
+      header.append(description, links, familyGuidance(records));
       group.append(summary, header);
       const pages = Math.max(1, Math.ceil(records.length / 25));
       const page = Math.min(familyPages.get(family) || 1, pages);
