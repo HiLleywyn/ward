@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import Callable
 from urllib.parse import quote
 
 from .api import APIError, ScanCoordinator, normalize_sha256, openapi_document, public_scan, report_for_job
@@ -22,6 +21,7 @@ TOOLS = [
                 "url": {"type": "string", "format": "uri"},
                 "ref": {"type": "string", "maxLength": 200},
                 "expected_commit": {"type": "string", "pattern": "^[A-Fa-f0-9]{40,64}$"},
+                "analysis": {"type": "string", "enum": ["static", "extended", "behavioral"]},
                 "sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
                 "idempotency_key": {"type": "string", "maxLength": 128},
             },
@@ -128,16 +128,14 @@ def _call_tool(
     arguments: object,
     coordinator: ScanCoordinator,
     store: ResultStore,
-    consume_scan_quota: Callable[[], None],
 ) -> dict:
     if not isinstance(arguments, dict):
         raise APIError(400, "invalid_arguments", "Tool arguments must be an object")
     if name == "ward_submit_scan":
-        consume_scan_quota()
         kind = arguments.get("kind")
         if kind == "file":
             raise APIError(422, "unsupported_scan_kind", "MCP accepts repository and sha256 scans; use the REST API for files")
-        payload = {key: arguments[key] for key in ("kind", "url", "ref", "expected_commit", "sha256") if key in arguments}
+        payload = {key: arguments[key] for key in ("kind", "url", "ref", "expected_commit", "sha256", "analysis") if key in arguments}
         job, _, _ = coordinator.submit(payload, arguments.get("idempotency_key"))
         return _tool_result(job)
     if name == "ward_get_badge":
@@ -219,7 +217,6 @@ def handle_message(
     message: object,
     coordinator: ScanCoordinator,
     store: ResultStore,
-    consume_scan_quota: Callable[[], None],
 ) -> dict | None:
     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
         return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid Request"}}
@@ -232,8 +229,8 @@ def handle_message(
             result = {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": {"tools": {"listChanged": False}, "resources": {"listChanged": False}},
-                "serverInfo": {"name": "ward", "version": "0.5.6"},
-                "instructions": "Ward scans public Git repositories and hashes without executing them. Unknown never means safe.",
+                "serverInfo": {"name": "ward", "version": "0.6.0"},
+                "instructions": "Ward scans public Git repositories and hashes. Extended scans add isolated static analysis; Windows behavior is offered only when its disposable worker is verified online. Unknown never means safe.",
             }
         elif method == "ping":
             result = {}
@@ -241,7 +238,7 @@ def handle_message(
             result = {"tools": TOOLS}
         elif method == "tools/call":
             params = message.get("params") or {}
-            result = _call_tool(str(params.get("name", "")), params.get("arguments") or {}, coordinator, store, consume_scan_quota)
+            result = _call_tool(str(params.get("name", "")), params.get("arguments") or {}, coordinator, store)
         elif method == "resources/list":
             result = {"resources": [{
                 "uri": "ward://openapi", "name": "Ward OpenAPI 3.1 contract",

@@ -14,7 +14,7 @@ def badge_state(job: dict | None) -> tuple[str, str, str]:
     verdict = job["result"].get("status")
     if verdict == "Malicious":
         return "✕", "malware detected", "#c94f4f"
-    if verdict == "Corroborated":
+    if verdict in {"Corroborated", "Suspicious"}:
         return "!", "suspicious", "#c47b3a"
     if job["result"].get("findings"):
         return "!", "review findings", "#c47b3a"
@@ -83,9 +83,16 @@ def scan_record_page(job: dict, report: dict | None) -> bytes:
         finding_html = "<li>No configured indicator or static rule matched. This does not prove safety.</li>"
     limitations = "".join(f"<li>{html.escape(str(item))}</li>" for item in result.get("limitations", []))
     report_json = html.escape(json.dumps(report, indent=2)) if report else "Report is available when the scan reaches a terminal state."
+    analyses_html = "".join(
+        '<details class="record-card"><summary>{} · {} · {}</summary><pre>{}</pre></details>'.format(
+            html.escape(item["engine"]), html.escape(item["path"]), html.escape(item["status"]),
+            html.escape(json.dumps(item.get("result") or {"error": item.get("error"), "status": item["status"]}, indent=2)),
+        ) for item in job.get("analyses", [])
+    )
     body = f"""<section class="record-card"><dl class="record-facts">{rows}</dl></section>
 <section class="record-card"><h2>Findings</h2><ul class="record-findings">{finding_html}</ul></section>
 <section class="record-card"><h2>Limits</h2><ul>{limitations or '<li>No additional limits recorded.</li>'}</ul></section>
+{analyses_html}
 <details class="record-card"><summary>Machine-Readable Report</summary><pre>{report_json}</pre></details>"""
     return _page("Scan Record", body)
 

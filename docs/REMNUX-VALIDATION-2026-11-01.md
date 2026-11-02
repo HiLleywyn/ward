@@ -47,8 +47,10 @@ native capability analysis pending unpacking.
 
 The operator command is `ward remnux FILE --sha256 EXPECTED_HASH`. It produces
 JSON bound to the artifact and image digests. It does not launch malware, claim
-the Verified tier, or automatically publish its report. The public service
-continues to use Ward's static engine; REMnux is an installed operator tier.
+the Verified tier, or promote its report into the curated malware database.
+Ward 0.6.0 also uses this runner automatically for at most two executables from
+an Extended repository scan. The separate controller result is attached to the
+originating public scan while its immutable base evidence digest is preserved.
 
 No sample bytes were retained in this repository, and no customer or third-party
 system was tested. The known sample was retrieved from its pinned public GitHub

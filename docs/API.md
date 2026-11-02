@@ -13,7 +13,11 @@ https://ward.lley.cat/api/v1/openapi.json
 Ward keeps one evidence model across its website, REST API, MCP tools, and CLI:
 
 - The existing static scanner clones public HTTPS Git repositories into a temporary directory and never executes their code.
-- A single bounded background worker serializes asynchronous scan jobs.
+- A single bounded background worker serializes asynchronous repository scans.
+- Eligible executables from Extended scans are copied into a durable bounded
+  analysis queue, then removed as soon as an isolated worker finishes or fails.
+- The REMnux controller is separate from the public web container. Windows
+  behavior runs only through a verified host worker and disposable Sandbox.
 - SQLite stores lifecycle state, reports, exact commits, branches, and historical comparisons.
 - Existing website scans and API or MCP repository scans populate the same Recent Scans history.
 - Reviewed Malware Records remain curated source evidence. Automated scans cannot promote themselves into that database.
@@ -40,12 +44,23 @@ Completed repository scans record the normalized repository URL, exact commit, c
 curl -i https://ward.lley.cat/api/v1/scans \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: example-repository-main-1" \
-  --data '{"kind":"repository","url":"https://github.com/owner/repository","ref":"main","expected_commit":"0123456789abcdef0123456789abcdef01234567"}'
+  --data '{"kind":"repository","url":"https://github.com/owner/repository","ref":"main","expected_commit":"0123456789abcdef0123456789abcdef01234567","analysis":"extended"}'
 ```
 
 The response is `202 Accepted` for a new job and `200 OK` when the same idempotency key and request are replayed. Reusing a key for a different request returns `409 Conflict`.
 
 `expected_commit` closes the branch-movement race used by CI. Ward fails the job if the cloned ref does not resolve to that exact object ID.
+
+Repository analysis modes are:
+
+- `static`: clone, hash, source rules, bounded archive inspection, and reviewed indicators.
+- `extended`: static plus automatic offline REMnux analysis for at most two discovered Windows executables.
+- `behavioral`: extended plus disposable offline Windows Sandbox execution when the verified Windows worker is online.
+
+`GET /api/v1/engines` reports current worker availability. A behavioral request
+fails with `503` instead of silently downgrading when the Windows worker is not
+available. Follow-up analyses are attached to the scan as `analyses`; they can
+still be queued when the repository scan itself reaches `completed`.
 
 ## Submit a SHA-256 lookup
 
@@ -85,7 +100,7 @@ The events endpoint emits bounded server-sent events until the job reaches a ter
 Report verdicts are:
 
 - `malicious`: exact reviewed indicator evidence was detected.
-- `suspicious`: repository-specific research corroborates the target without an exact artifact match.
+- `suspicious`: repository-specific research or bounded source-behavior evidence warrants review without an exact artifact match.
 - `unknown`: analysis completed without enough evidence for a conclusion.
 - `incomplete`: the job failed, was cancelled, or did not finish reliably.
 
@@ -94,7 +109,7 @@ Ward does not define or issue a `clean` verdict. Reports separately describe ver
 - `observed`: a registry lookup was completed without receiving the artifact.
 - `partial`: Ward reached an inspection bound.
 - `inspected`: Ward completed its configured bounded static inspection.
-- `verified`: reserved for a future isolated build and behavioral-analysis tier. Ward does not currently issue it.
+- `verified`: reserved for a stronger attested build and behavioral-analysis tier. Ward does not currently issue it.
 
 The evidence digest content-addresses the exact persisted result. It detects accidental result changes, but it is not a third-party digital signature.
 
@@ -129,7 +144,7 @@ A portable plugin package and Ward skill are under `integrations/ward-plugin`.
 
 ## Security and limits
 
-- Public submissions have no hourly allowance. A bounded queue and one repository worker control simultaneous work.
+- Public submissions have no hourly allowance. A bounded queue, one repository worker, and an eight-job follow-up queue control simultaneous work.
 - Git hosts are restricted to public HTTPS on port 443. Credentials, fragments, query strings, local addresses, and private DNS results are rejected.
 - The scanner pins the validated public IP in libcurl for the clone to reduce DNS-rebinding risk and disables Git HTTP redirects, file protocol, ext protocol, prompts, and LFS downloads.
 - Repository, file count, byte, hash, text, archive expansion, process, memory, and request body limits remain enforced.
@@ -137,5 +152,6 @@ A portable plugin package and Ward skill are under `integrations/ward-plugin`.
 - Ward has no account system or user-generated API keys in this release. Anonymous access is deliberately constrained. The cancellation capability is the only per-job write authority.
 - Webhooks are not implemented because safe delivery requires a durable retry and SSRF policy that Ward does not yet need.
 - STIX export is not implemented because Ward's present evidence does not benefit from a lossy mapping merely to claim format support.
-- Queued file bytes live only in process memory. If Ward restarts before processing them, the job becomes `incomplete` and the bytes are gone.
-- Ward performs static analysis only. It does not execute packages, installers, scripts, or samples.
+- REST file-scan bytes live only in process memory. If Ward restarts before processing them, the job becomes `incomplete` and the bytes are gone.
+- Automatic repository-artifact bytes are stored only in the dedicated analysis queue. They are hash-bound to the completed scan and cleared on completion, failure, expiration, or originating-scan recovery.
+- The web scanner never executes repository code. REMnux treats samples as data. Optional Windows behavior executes only inside a disposable offline Sandbox and remains `partial`, not `verified`.

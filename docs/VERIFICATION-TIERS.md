@@ -40,3 +40,9 @@ Containers alone do not satisfy the Verified boundary. Ward will not mount the D
 The [REMnux operator command](REMNUX.md) is available for deeper static file
 analysis in a disposable offline container. It reports tool outcomes and exact
 artifact/image digests. It does not issue Verified results or run sample code.
+
+Ward's optional [Windows behavior](WINDOWS-BEHAVIOR.md) tier is a separate
+offline disposable boundary with a benign startup smoke test. Its evidence is
+explicitly `partial`: writable transfer telemetry can be tampered with, runtime
+coverage is bounded, and no reproducible build or authenticated guest
+attestation exists. It therefore does not issue `Verified` either.

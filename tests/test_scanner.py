@@ -191,6 +191,81 @@ class StaticInspectionTests(unittest.TestCase):
         match = next(finding for finding in result["findings"] if finding["kind"] == "persistence-task")
         self.assertEqual(match["path"], "release.zip!install.cmd")
 
+    def test_python_behavior_inside_zip_is_inspected_without_execution(self):
+        source = 'import discord\nasync def raid(channel):\n    while True:\n        await channel.send("@everyone fixture")\n'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with zipfile.ZipFile(root / "release.zip", "w") as archive:
+                archive.writestr("Nuker.py", source)
+            result = inspect_tree(root, indicators={"indicators": []})
+        match = next(finding for finding in result["findings"] if finding["kind"] == "discord-mention-flood")
+        self.assertEqual(match["path"], "release.zip!Nuker.py")
+
+    def test_discord_abuse_source_is_flagged_without_execution(self):
+        source = '''
+import discord
+
+async def raid(guild, channel):
+    while True:
+        await channel.send("@everyone fixture")
+
+async def flood_roles(guild):
+    while True:
+        await guild.create_role(name="fixture")
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Nuker.py").write_text(source, encoding="utf-8")
+            result = inspect_tree(root, indicators={"indicators": []})
+
+        kinds = {finding["kind"] for finding in result["findings"]}
+        self.assertIn("discord-mention-flood", kinds)
+        self.assertIn("discord-resource-flood", kinds)
+        self.assertTrue(all(finding.get("evidence_type") == "source-behavior" for finding in result["findings"]))
+
+    def test_bounded_discord_actions_are_not_called_an_abuse_loop(self):
+        source = '''
+import discord
+
+async def announce(channel):
+    await channel.send("@everyone scheduled maintenance")
+
+async def bounded(guild):
+    while True:
+        await guild.create_role(name="fixture")
+        break
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "bot.py").write_text(source, encoding="utf-8")
+            result = inspect_tree(root, indicators={"indicators": []})
+
+        kinds = {finding["kind"] for finding in result["findings"]}
+        self.assertNotIn("discord-mention-flood", kinds)
+        self.assertNotIn("discord-resource-flood", kinds)
+
+    def test_embedded_discord_token_is_redacted(self):
+        token = "A" * 24 + "." + "B" * 6 + "." + "C" * 30
+        source = f'import discord\nbot.run("{token}")\n'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "bot.py").write_text(source, encoding="utf-8")
+            result = inspect_tree(root, indicators={"indicators": []})
+
+        finding = next(item for item in result["findings"] if item["kind"] == "embedded-discord-token")
+        self.assertEqual(finding["evidence_type"], "credential-exposure")
+        serialized = str(finding)
+        self.assertNotIn(token, serialized)
+        self.assertIn("[REDACTED]", serialized)
+
+    def test_decoded_content_is_not_flagged_unless_executed(self):
+        source = 'import base64\npayload = base64.b64decode("Zml4dHVyZQ==")\n'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "decode.py").write_text(source, encoding="utf-8")
+            result = inspect_tree(root, indicators={"indicators": []})
+        self.assertNotIn("decoded-python-execution", {finding["kind"] for finding in result["findings"]})
+
 
 if __name__ == "__main__":
     unittest.main()

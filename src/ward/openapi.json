@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Ward API",
-    "version": "1.0.0",
-    "description": "Bounded malware analysis for public Git repositories, files, and SHA-256 values. An unknown verdict never means safe."
+    "version": "1.1.0",
+    "description": "Bounded malware analysis for public Git repositories, files, and SHA-256 values. Repository scans can add isolated REMnux static analysis and, when a verified worker is online, disposable Windows behavior. An unknown verdict never means safe."
   },
   "servers": [{"url": "https://ward.lley.cat"}],
   "tags": [
@@ -25,6 +25,14 @@
         "tags": ["Protocol"],
         "summary": "Retrieve the OpenAPI contract",
         "responses": {"200": {"description": "OpenAPI 3.1 document", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/api/v1/engines": {
+      "get": {
+        "tags": ["Protocol"],
+        "summary": "Retrieve analysis worker availability",
+        "description": "Windows behavior is selectable only while its worker has passed a benign disposable-sandbox smoke test and is sending a current heartbeat.",
+        "responses": {"200": {"description": "Current engine availability", "content": {"application/json": {"schema": {"type": "object"}}}}}
       }
     },
     "/api/v1/scans": {
@@ -53,7 +61,6 @@
           "400": {"$ref": "#/components/responses/Error"},
           "413": {"$ref": "#/components/responses/Error"},
           "422": {"$ref": "#/components/responses/Error"},
-          "429": {"$ref": "#/components/responses/Error"},
           "503": {"$ref": "#/components/responses/Error"}
         }
       }
@@ -187,7 +194,7 @@
       "ScanStatus": {"type": "string", "enum": ["queued", "running", "completed", "failed", "cancelled", "incomplete"]},
       "ScanSubmission": {
         "oneOf": [
-          {"type": "object", "required": ["kind", "url"], "properties": {"kind": {"const": "repository"}, "url": {"type": "string", "format": "uri"}, "ref": {"type": "string", "maxLength": 200}, "expected_commit": {"type": "string", "pattern": "^[A-Fa-f0-9]{40,64}$"}}, "additionalProperties": false},
+          {"type": "object", "required": ["kind", "url"], "properties": {"kind": {"const": "repository"}, "url": {"type": "string", "format": "uri"}, "ref": {"type": "string", "maxLength": 200}, "expected_commit": {"type": "string", "pattern": "^[A-Fa-f0-9]{40,64}$"}, "analysis": {"type": "string", "enum": ["static", "extended", "behavioral"], "default": "extended"}}, "additionalProperties": false},
           {"type": "object", "required": ["kind", "sha256"], "properties": {"kind": {"const": "sha256"}, "sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}, "additionalProperties": false},
           {"type": "object", "required": ["kind", "filename", "content_base64"], "properties": {"kind": {"const": "file"}, "filename": {"type": "string"}, "content_base64": {"type": "string", "contentEncoding": "base64"}}, "additionalProperties": false}
         ]
@@ -204,9 +211,26 @@
           "status": {"$ref": "#/components/schemas/ScanStatus"},
           "progress": {"type": "integer", "minimum": 0, "maximum": 100},
           "result": {"type": ["object", "null"]},
+          "analyses": {"type": "array", "items": {"$ref": "#/components/schemas/ArtifactAnalysis"}},
           "error_code": {"type": ["string", "null"]},
           "error_message": {"type": ["string", "null"]},
           "links": {"type": "object", "additionalProperties": {"type": "string"}}
+        }
+      },
+      "ArtifactAnalysis": {
+        "type": "object",
+        "required": ["id", "scan_id", "engine", "path", "sha256", "status", "created_at", "updated_at"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "scan_id": {"type": "string", "format": "uuid"},
+          "engine": {"type": "string", "enum": ["remnux", "windows"]},
+          "path": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+          "status": {"type": "string", "enum": ["queued", "running", "completed", "incomplete"]},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "result": {"type": ["object", "null"]},
+          "error": {"type": ["string", "null"]}
         }
       },
       "Report": {

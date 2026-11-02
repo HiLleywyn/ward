@@ -91,6 +91,9 @@ class ResultStore:
                     ),
                 )
 
+        from .analysis import AnalysisQueue
+        self.analyses = AnalysisQueue(self)
+
     @contextmanager
     def connect(self):
         connection = sqlite3.connect(self.path, timeout=15)
@@ -185,7 +188,10 @@ class ResultStore:
     def scan_job(self, scan_id: str) -> dict | None:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM scan_jobs WHERE id = ?", (scan_id,)).fetchone()
-        return self._scan_job(row)
+        job = self._scan_job(row)
+        if job is not None:
+            job["analyses"] = self.analyses.list(scan_id)
+        return job
 
     def list_scan_jobs(
         self,
@@ -221,7 +227,10 @@ class ResultStore:
                 f"SELECT * FROM scan_jobs{where} ORDER BY rowid DESC LIMIT ?", (*values, limit + 1)
             ).fetchall()
         next_cursor = rows[limit - 1][0] if len(rows) > limit else None
-        return [self._scan_job(row) for row in rows[:limit]], next_cursor
+        jobs = [self._scan_job(row) for row in rows[:limit]]
+        for job in jobs:
+            job["analyses"] = self.analyses.list(job["id"])
+        return jobs, next_cursor
 
     def start_scan_job(self, scan_id: str) -> bool:
         now = datetime.now(timezone.utc).isoformat()
@@ -282,11 +291,21 @@ class ResultStore:
     def recover_interrupted_scan_jobs(self) -> int:
         now = datetime.now(timezone.utc).isoformat()
         with self.connect() as connection:
+            interrupted = [row[0] for row in connection.execute(
+                "SELECT id FROM scan_jobs WHERE status IN ('queued','running')"
+            ).fetchall()]
             cursor = connection.execute(
                 "UPDATE scan_jobs SET status = 'incomplete', progress = 100, updated_at = ?, "
                 "error_code = 'worker_restarted', error_message = 'The scanner restarted before this job finished' "
                 "WHERE status IN ('queued','running')", (now,),
             )
+            if interrupted:
+                placeholders = ",".join("?" for _ in interrupted)
+                connection.execute(
+                    f"UPDATE artifact_analyses SET status='incomplete',payload=NULL,claim_token=NULL,updated_at=?,"
+                    f"error='Originating scan did not complete' WHERE scan_id IN ({placeholders}) AND status IN ('queued','running')",
+                    (now, *interrupted),
+                )
         return cursor.rowcount
 
     def public_artifact(self, sha256: str) -> dict | None:
@@ -441,15 +460,19 @@ class ResultStore:
             **self._compare_results(base, head),
         }
 
-    def recent_repository_scans(self, limit: int = 20) -> list[dict]:
-        if not 1 <= limit <= 100:
+    def recent_repository_scans(self, limit: int = 20, offset: int = 0) -> list[dict]:
+        if not 1 <= limit <= 100 or not 0 <= offset <= 1_000_000:
             raise ValueError("Scan history limit must be 1 to 100")
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT payload FROM observations WHERE kind = 'repository-scan' ORDER BY rowid DESC LIMIT ?",
-                (limit,),
+                "SELECT payload FROM observations WHERE kind = 'repository-scan' ORDER BY rowid DESC LIMIT ? OFFSET ?",
+                (limit, offset),
             ).fetchall()
         return [json.loads(row[0]) for row in rows]
+
+    def repository_scan_count(self) -> int:
+        with self.connect() as connection:
+            return connection.execute("SELECT count(*) FROM observations WHERE kind='repository-scan'").fetchone()[0]
 
     def report(self, target: str, evidence_url: str, description: str) -> str:
         owner, name = parse_repository_target(target)

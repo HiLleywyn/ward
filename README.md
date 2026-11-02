@@ -21,8 +21,10 @@ historical campaign repositories.
 
 Ward clones public HTTPS Git repositories into a constrained container, records
 the exact commit, hashes bounded files, inspects scripts and small archives, and
-compares content against an evidence-backed malware indicator registry. It does
-not execute repository code, installers, build scripts, or package hooks.
+compares content against an evidence-backed malware indicator registry. Python
+source checks also identify bounded abuse patterns such as unbounded Discord
+mass mentions, resource creation, and destructive server-wide loops without
+importing or executing the source.
 
 Completed results include an evidence digest and verification tier. `Inspected`
 means Ward completed its configured static checks for that exact revision. It is
@@ -80,8 +82,15 @@ ward web
 This opens a local interface at `http://127.0.0.1:8787`. Paste a GitHub shorthand,
 a GitHub URL, or another public HTTPS Git URL. Ward clones the repository into a
 temporary directory, inspects it without running its code, stores the scan
-record, then removes the checkout. Public scans are serialized, size-bounded,
-and rate-limited.
+record, then removes the checkout. Public scans are serialized and size-bounded.
+There is no hourly allowance; a bounded queue and worker concurrency provide
+admission control.
+
+The default Extended scan sends at most two discovered Windows executables to a
+separate trusted controller for offline REMnux static analysis. The public web
+container has no Docker management socket. Windows behavior is selectable only
+while a host worker has passed a benign disposable-Sandbox smoke test and is
+sending a current heartbeat. Neither mode upgrades a result to `Verified`.
 
 The public interface no longer accepts file uploads. Local file hashing remains
 available through the CLI below, where the file stays on your machine.
@@ -110,8 +119,9 @@ and duplicate records before advisory data is published.
 ## Check a downloaded file
 
 For deeper static file analysis using the official REMnux container, see
-[REMnux setup and usage](docs/REMNUX.md). The `ward remnux` operator command adds
-PE metadata and static capabilities without executing the sample.
+[REMnux setup and usage](docs/REMNUX.md). Extended website, REST, and MCP scans
+queue eligible executable artifacts automatically; the `ward remnux` operator
+command remains available for explicit local analysis.
 
 ```powershell
 ward file C:\Users\you\Downloads\suspicious.zip
@@ -152,9 +162,9 @@ safety guarantees.
 
 ## Evidence policy
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). In short: no malware samples, no mass
-accusations, no automatic reporting, no dynamic execution in this project, and
-no confirmed label without exact evidence.
+See [CONTRIBUTING.md](CONTRIBUTING.md). In short: no malware samples in the
+repository, no mass accusations, no automatic reporting, no execution on the
+public web-service host, and no confirmed label without exact evidence.
 
 ## Reporting a confirmed malicious repository
 
@@ -190,11 +200,11 @@ specific reviewed claim and never means a program is guaranteed safe.
 
 Public mode hides legacy local history and local file paths. Repository scan
 records are intentionally public and contain repository paths, commit IDs,
-findings, hashes that matched known indicators, and scan limits. The scanner is
-globally capped at 120 scan requests per hour, with a 12-per-client hourly cap
-and one repository worker at a time.
-The legacy GitHub metadata endpoint is cached for 15 minutes and capped at eight
-fresh checks per hour. Local file hashing remains CLI-only.
+findings, hashes that matched known indicators, analysis state, and scan limits.
+There is no hourly or per-client allowance. Work is constrained by a bounded
+queue, one repository worker, artifact-size limits, and at most two automatic
+follow-up artifacts per scan. The legacy GitHub metadata endpoint is cached for
+15 minutes. Local file hashing remains CLI-only.
 
 Maintained by Lleywyn. No analytics or advertising scripts are included.
 

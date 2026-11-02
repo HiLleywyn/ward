@@ -5,7 +5,6 @@ import os
 import threading
 import time
 import webbrowser
-from collections import deque
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -32,16 +31,13 @@ def _handler() -> type[BaseHTTPRequestHandler]:
         client.token = None
     store = default_store()
     cache = {}
-    checks = deque()
-    scans = deque()
-    scans_by_client: dict[str, deque] = {}
     check_lock = threading.Lock()
     scan_lock = threading.Lock()
     scan_slot = threading.BoundedSemaphore(1)
     coordinator = ScanCoordinator(store, scan_slot)
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "Ward/0.5.6"
+        server_version = "Ward/0.6.0"
         sys_version = ""
 
         def setup(self):
@@ -106,10 +102,6 @@ def _handler() -> type[BaseHTTPRequestHandler]:
             except json.JSONDecodeError as exc:
                 raise APIError(400, "invalid_json", "Request body must contain valid JSON") from exc
 
-        def _consume_scan_quota(self) -> None:
-            # Admission is bounded by the queue and worker concurrency, not an hourly allowance.
-            return
-
         def _origin_allowed(self) -> bool:
             origin = self.headers.get("Origin")
             return not origin or origin in {"https://ward.lley.cat", f"http://{self.headers.get('Host')}"}
@@ -163,6 +155,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                     "openapi": "/api/v1/openapi.json",
                     "mcp": "/mcp",
                     "resources": {
+                        "engines": "/api/v1/engines",
                         "scans": "/api/v1/scans",
                         "repository_history": "/api/v1/repositories/history?target={repository}",
                         "scan_comparison": "/api/v1/comparisons?base_scan={id}&head_scan={id}",
@@ -172,6 +165,9 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                     },
                     "warning": "Unknown does not mean safe.",
                 })
+                return True
+            if path == "/api/v1/engines":
+                self._send_json({"items": store.analyses.workers(), "default_analysis": "extended" if os.environ.get("WARD_REMNUX_AUTO") == "1" else "static"})
                 return True
             if path == "/api/v1/openapi.json":
                 self._send_json(openapi_document())
@@ -378,15 +374,31 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 self._send_json({"observations": [] if public else store.history()})
                 return
             if request.path == "/api/scans":
-                recent = store.recent_repository_scans(20)
+                query = parse_qs(request.query)
+                try:
+                    page = int(query.get("page", ["1"])[0])
+                    if not 1 <= page <= 20_000:
+                        raise ValueError("Invalid page")
+                except ValueError:
+                    self._send_json({"error": "page must be a positive integer"}, HTTPStatus.BAD_REQUEST)
+                    return
+                total = store.repository_scan_count()
+                pages = max(1, (total + 49) // 50)
+                page = min(page, pages)
+                recent = store.recent_repository_scans(50, (page - 1) * 50)
+                histories = {}
                 for scan in recent:
-                    history = store.repository_history(scan.get("repository_url") or scan["repository"])
+                    scan["analyses"] = store.analyses.list(scan["id"])
+                    target = scan.get("repository_url") or scan["repository"]
+                    if target not in histories:
+                        histories[target] = store.repository_history(target)
+                    history = histories[target]
                     scan["history"] = {
                         "scan_count": len(history["scans"]),
                         "transitions": history["transitions"],
                         "related_repositories": history["related_repositories"],
                     }
-                self._send_json({"scans": recent})
+                self._send_json({"scans": recent, "page": page, "page_size": 50, "total": total, "pages": pages})
                 return
             route = routes.get(request.path)
             if route is None:
@@ -419,20 +431,19 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                         if isinstance(payload, list):
                             responses = [
                                 response for item in payload
-                                if (response := handle_mcp_message(item, coordinator, store, self._consume_scan_quota)) is not None
+                                if (response := handle_mcp_message(item, coordinator, store)) is not None
                             ]
                             if not responses:
                                 self._headers("application/json; charset=utf-8", 0, HTTPStatus.ACCEPTED)
                                 return
                             self._send_json(responses)
                             return
-                        response = handle_mcp_message(payload, coordinator, store, self._consume_scan_quota)
+                        response = handle_mcp_message(payload, coordinator, store)
                         if response is None:
                             self._headers("application/json; charset=utf-8", 0, HTTPStatus.ACCEPTED)
                         else:
                             self._send_json(response)
                         return
-                    self._consume_scan_quota()
                     job, cancel_token, created = coordinator.submit(payload, self.headers.get("Idempotency-Key"))
                     extra = {"Location": job["links"]["self"]}
                     if cancel_token:
@@ -454,7 +465,6 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                     raise ValueError("Request must be a JSON object")
                 if request.path == "/api/scan-repo":
                     target = normalize_repository_url(str(payload.get("target", "")))
-                    now = time.monotonic()
                     with scan_lock:
                         if not scan_slot.acquire(blocking=False):
                             self._send_json({"error": "Another repository scan is running. Try again in a moment."}, HTTPStatus.TOO_MANY_REQUESTS)

@@ -20,6 +20,7 @@ from uuid import uuid4
 from .analyze import load_indicators, parse_repository_target
 from .data import advisory_directory
 from .evidence import repository_warning
+from .source_rules import python_findings
 
 
 MAX_FILES = 5_000
@@ -246,7 +247,9 @@ def _archive_findings(path: Path, display_path: str) -> tuple[list[dict], int]:
                 budget -= len(data)
                 text = _decode_text(data)
                 if text is not None:
-                    findings.extend(_pattern_findings(text, f"{display_path}!{member.filename}"))
+                    member_path = f"{display_path}!{member.filename}"
+                    findings.extend(_pattern_findings(text, member_path))
+                    findings.extend(python_findings(text, member_path))
                     inspected += 1
     except (OSError, zipfile.BadZipFile, RuntimeError):
         findings.append({
@@ -399,7 +402,7 @@ def _pyinstaller_findings(path: Path, display_path: str) -> tuple[list[dict], bo
     return findings, False, True
 
 
-def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
+def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=None) -> dict:
     indicators = indicators or load_indicators(advisory_directory() / "indicators.json")
     known_hashes = {
         item["sha256"].lower(): item
@@ -407,6 +410,7 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
         if item.get("status") == "confirmed"
     }
     findings: list[dict] = []
+    artifacts: list[dict] = []
     file_count = total_bytes = hashed_bytes = text_files = archives = executable_files = 0
     truncated = False
     coverage_incomplete = False
@@ -438,6 +442,10 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
                         digest.update(chunk)
                 sha256 = digest.hexdigest()
                 hashed_bytes += size
+                if suffix in {".exe", ".dll", ".scr"}:
+                    artifacts.append({"path": relative, "sha256": sha256, "size": size})
+                    if artifact_sink is not None:
+                        artifact_sink(relative, sha256, path)
                 if sha256 in known_hashes:
                     match = known_hashes[sha256]
                     findings.append({
@@ -488,6 +496,10 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
             if text is not None:
                 text_files += 1
                 findings.extend(_pattern_findings(text, relative))
+                source_findings = python_findings(text, relative)
+                findings.extend(source_findings)
+                if any(item['kind'] in {'python-source-limit', 'python-source-unparsed'} for item in source_findings):
+                    coverage_incomplete = True
                 if path.name == "package.json":
                     try:
                         scripts = json.loads(text).get("scripts", {})
@@ -505,7 +517,7 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
     rank = {"critical": 0, "high": 1, "medium": 2, "info": 3}
     findings.sort(key=lambda item: (rank.get(item["severity"], 9), item.get("path", ""), item["title"]))
     archive_incomplete = any(
-        item.get("kind") in {"archive-expansion", "archive-unreadable"}
+        item.get("kind") in {"archive-expansion", "archive-unreadable", "python-source-limit", "python-source-unparsed"}
         for item in findings
     )
     return {
@@ -518,10 +530,11 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
         "truncated": truncated,
         "partial": truncated or archive_incomplete or coverage_incomplete,
         "findings": findings[:100],
+        "artifacts": artifacts,
     }
 
 
-def scan_repository(value: str, ref: str | None = None, expected_commit: str | None = None) -> dict:
+def scan_repository(value: str, ref: str | None = None, expected_commit: str | None = None, *, artifact_sink=None) -> dict:
     started = time.monotonic()
     ref = normalize_git_ref(ref)
     if expected_commit is not None and not COMMIT_PATTERN.fullmatch(expected_commit):
@@ -587,13 +600,15 @@ def scan_repository(value: str, ref: str | None = None, expected_commit: str | N
             ).stdout.strip()
         except (subprocess.SubprocessError, OSError) as exc:
             raise ScanError("Repository branch could not be recorded") from exc
-        inspected = inspect_tree(checkout)
+        inspected = inspect_tree(checkout, artifact_sink=artifact_sink)
     warning = repository_warning(_github_target(url)) if _github_target(url) else None
     exact_matches = sum(1 for item in inspected["findings"] if item["kind"] == "known-malware-hash")
     if exact_matches:
         status = "Malicious"
     elif warning is not None:
         status = "Corroborated"
+    elif any(item.get("evidence_type") == "source-behavior" for item in inspected["findings"]):
+        status = "Suspicious"
     else:
         status = "Unverified"
     sources = [
@@ -618,6 +633,7 @@ def scan_repository(value: str, ref: str | None = None, expected_commit: str | N
         "duration_ms": round((time.monotonic() - started) * 1000),
         "summary": {key: inspected[key] for key in ("files", "bytes", "hashed_bytes", "text_files", "archives", "executable_files", "truncated")},
         "findings": inspected["findings"],
+        "artifacts": inspected["artifacts"],
         "sources": sources,
         "verification": {
             "level": "partial" if inspected["partial"] else "inspected",

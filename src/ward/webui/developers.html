@@ -102,12 +102,14 @@
       <div class="developer-title">
         <div>
           <h2 id="limits-title">Security and limits</h2>
-          <p>Ward performs bounded static inspection. It never executes repository code.</p>
+          <p>Ward keeps static inspection separate from optional isolated follow-up analysis.</p>
         </div>
       </div>
       <ul class="limit-list">
         <li>Public HTTPS Git repositories only.</li>
         <li>No hourly scan allowance. Work is bounded by queue and concurrency limits.</li>
+        <li>Extended scans attach automatic offline REMnux evidence for at most two Windows executables.</li>
+        <li>Windows behavior is offered only while its disposable worker is verified online.</li>
         <li>MCP accepts repository and SHA-256 scans, not file uploads.</li>
         <li><strong>Unknown</strong> or <strong>Inspected</strong> never means safe.</li>
       </ul>

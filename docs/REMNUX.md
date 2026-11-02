@@ -51,14 +51,22 @@ attempt established payload behavior.
 
 ## Boundary and current integration
 
-This command requires an operator with local Docker access. The public web
-service has no Docker socket and cannot launch analysis containers. Reports
-are returned to the operator; they are not automatically added to public scan
-history or used to rewrite previous evidence records. Public REST/MCP scans
-continue to use Ward's bounded static engine.
+The operator command requires local Docker access. Public Extended website,
+REST, and MCP scans now queue at most two discovered Windows executables for the
+same analysis automatically. A separate trusted controller owns the Docker
+socket; the public web container does not. The controller passes bytes directly
+to a disposable networkless child and writes the bounded result back to the
+originating scan. It cannot rewrite the immutable base result or promote a
+record into the curated malware database.
+
+The analysis queue is capped at eight active jobs. Artifact bytes are
+SHA-256-bound to a path in the completed scan and cleared after completion,
+failure, expiration, or interrupted-scan recovery. `GET /api/v1/engines`
+reports whether the controller has passed its smoke test and has a current
+heartbeat.
 
 This is deeper static analysis, not a behavioral sandbox or Ward's reserved
-Verified tier. Executing Windows malware needs a separate disposable Windows
-VM, isolated networking, controlled telemetry, and a verified reset mechanism.
-REMnux can support that lab, but a container on the service host does not provide
-that boundary.
+Verified tier. Optional Windows execution uses a separate disposable offline
+Sandbox and is documented in [Windows behavior](WINDOWS-BEHAVIOR.md). That
+partial telemetry still does not satisfy the stronger attestation requirements
+for `Verified`.

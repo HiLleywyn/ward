@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import queue
 import re
 import secrets
@@ -143,6 +144,7 @@ def report_for_job(job: dict) -> dict:
     status_map = {
         "Malicious": ("malicious", 1.0),
         "Corroborated": ("suspicious", 0.9),
+        "Suspicious": ("suspicious", 0.65),
         "Unverified": ("unknown", 0.0),
     }
     verdict, confidence = status_map.get(result.get("status"), ("incomplete", 0.0))
@@ -161,7 +163,11 @@ def report_for_job(job: dict) -> dict:
             "detections": result.get("findings", []),
             "error": ({"code": job["error_code"], "message": job["error_message"]}
                       if job.get("error_code") else None),
-        }],
+        }] + [{
+            "name": analysis["engine"], "status": analysis["status"],
+            "path": analysis["path"], "sha256": analysis["sha256"],
+            "details": analysis.get("result"), "error": analysis.get("error"),
+        } for analysis in job.get("analyses", [])],
         "evidence": {
             "sources": result.get("sources", []),
             "summary": result.get("summary", {}),
@@ -189,6 +195,11 @@ class ScanCoordinator:
             raise APIError(400, "invalid_request", "Request body must be a JSON object")
         kind = str(payload.get("kind", "")).strip().lower()
         if kind == "repository":
+            analysis = payload.get("analysis", "extended" if os.environ.get("WARD_REMNUX_AUTO") == "1" else "static")
+            if analysis not in {"static", "extended", "behavioral"}:
+                raise APIError(422, "invalid_analysis", "analysis must be static, extended, or behavioral")
+            if analysis == "behavioral" and not self.store.analyses.workers()["windows"]["available"]:
+                raise APIError(503, "windows_worker_unavailable", "The Windows behavioral worker is not available")
             try:
                 target = normalize_repository_url(str(payload.get("url", "")))
                 ref = normalize_git_ref(payload.get("ref"))
@@ -199,7 +210,7 @@ class ScanCoordinator:
                 expected_commit = str(expected_commit).strip().lower()
                 if not COMMIT_PATTERN.fullmatch(expected_commit):
                     raise APIError(422, "invalid_commit", "expected_commit must be a 40 to 64 character hexadecimal object ID")
-            return kind, target, {"target": target, "ref": ref, "expected_commit": expected_commit}
+            return kind, target, {"target": target, "ref": ref, "expected_commit": expected_commit, "analysis": analysis}
         if kind == "sha256":
             digest = normalize_sha256(payload.get("sha256"))
             return kind, digest, {"sha256": digest}
@@ -229,6 +240,7 @@ class ScanCoordinator:
         if kind == "repository":
             canonical_value["ref"] = work["ref"]
             canonical_value["expected_commit"] = work["expected_commit"]
+            canonical_value["analysis"] = work["analysis"]
         elif kind == "file":
             canonical_value["filename"] = work["filename"]
         canonical = json.dumps(canonical_value, sort_keys=True, separators=(",", ":"))
@@ -273,11 +285,28 @@ class ScanCoordinator:
                 if not self.store.start_scan_job(scan_id):
                     continue
                 if kind == "repository":
+                    samples = []
+
+                    def capture(path, digest, source):
+                        if len(samples) < 2:
+                            data = source.read_bytes()
+                            samples.append((path, digest, data))
+
                     self.repository_slot.acquire()
                     try:
-                        result = scan_repository(work["target"], work["ref"], work["expected_commit"])
+                        if work["analysis"] != "static":
+                            result = scan_repository(work["target"], work["ref"], work["expected_commit"], artifact_sink=capture)
+                        else:
+                            result = scan_repository(work["target"], work["ref"], work["expected_commit"])
                     finally:
                         self.repository_slot.release()
+                    if work["analysis"] != "static":
+                        for path, digest, data in samples:
+                            self.store.analyses.enqueue(scan_id, path, digest, data)
+                            if work["analysis"] == "behavioral":
+                                self.store.analyses.enqueue(scan_id, path, digest, data, "windows")
+                        result["analysis_policy"] = {"requested": work["analysis"], "max_artifacts": 2,
+                                                     "selected": len(samples), "eligible": len(result.get("artifacts", []))}
                 elif kind == "file":
                     result = scan_file(work["data"], work["filename"], work["sha256"])
                 else:
@@ -286,7 +315,9 @@ class ScanCoordinator:
                 self.store.complete_scan_job(scan_id, result, publish_repository=kind == "repository")
             except (OSError, ScanError, ValueError, json.JSONDecodeError) as exc:
                 self.store.fail_scan_job(scan_id, "scan_failed", str(exc))
+                self.store.analyses.abandon_scan(scan_id)
             except Exception:
                 self.store.fail_scan_job(scan_id, "internal_error", "The scan failed unexpectedly")
+                self.store.analyses.abandon_scan(scan_id)
             finally:
                 self.queue.task_done()

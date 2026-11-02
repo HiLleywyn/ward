@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ward-github-scanner"
-version = "0.5.6"
+version = "0.6.0"
 description = "A public Git repository scanner backed by exact malware evidence"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,5 +22,8 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-ward = ["webui/*", "advisories/*.json", "openapi.json"]
+ward = ["webui/*", "advisories/*.json", "openapi.json", "windows_guest.ps1"]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
 

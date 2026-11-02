@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import resource
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -112,6 +113,11 @@ def analyze(data):
 
 
 def main():
+    def expired(signum, frame):
+        raise TimeoutError("REMnux guest deadline exceeded")
+
+    signal.signal(signal.SIGALRM, expired)
+    signal.alarm(110)
     # capa unpacks its trusted runtime libraries into scratch before analysis.
     resource.setrlimit(resource.RLIMIT_FSIZE, (128 * 1024 * 1024, 128 * 1024 * 1024))
     raw = sys.stdin.buffer.read(45 * 1024 * 1024 + 1)

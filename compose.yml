@@ -1,9 +1,11 @@
 services:
   ward:
     build: .
-    image: ward:0.5.6
+    image: ward:0.6.0
     container_name: ward
     restart: unless-stopped
+    environment:
+      WARD_REMNUX_AUTO: "1"
     ports:
       - "127.0.0.1:8794:8794"
     read_only: true
@@ -19,6 +21,31 @@ services:
     networks:
       ingress:
         aliases: [ward]
+  analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: ward-worker:0.6.0
+    container_name: ward-analysis
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    user: "10001:10001"
+    group_add: ["0"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    volumes:
+      - ward-state:/state
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "python", "-c", "from ward.evidence import default_store; assert default_store().analyses.workers()['remnux']['available']"]
+      interval: 30s
+      timeout: 3s
 networks:
   ingress:
     external: true

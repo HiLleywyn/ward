@@ -1,5 +1,6 @@
 *
 !Dockerfile
+!Dockerfile.worker
 !pyproject.toml
 !README.md
 !LICENSE

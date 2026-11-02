@@ -59,6 +59,15 @@ def build_parser() -> argparse.ArgumentParser:
     remnux.add_argument("path", type=Path)
     remnux.add_argument("--sha256", help="require this exact artifact hash before analysis")
 
+    worker = subparsers.add_parser("analysis-worker", help="run the trusted automatic REMnux controller")
+    worker.add_argument("--once", action="store_true")
+    windows = subparsers.add_parser("windows-worker", help="run the Windows Sandbox host controller")
+    windows.add_argument("--container", default="ward")
+    windows.add_argument("--once", action="store_true")
+    bridge = subparsers.add_parser("worker-bridge", help=argparse.SUPPRESS)
+    bridge.add_argument("--engine", choices=["remnux", "windows"], required=True)
+    bridge.add_argument("action", choices=["heartbeat", "claim", "finish"])
+
     web = subparsers.add_parser("web", help="launch the local interactive checker")
     web.add_argument("--port", type=int, default=8787)
     web.add_argument("--no-open", action="store_true", help="do not open a browser automatically")
@@ -88,6 +97,30 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "windows-worker":
+            from .windows_worker import run_windows_worker
+            run_windows_worker(args.container, once=args.once)
+            return 0
+        if args.command == "worker-bridge":
+            import base64
+            queue = default_store().analyses
+            if args.action == "heartbeat":
+                queue.heartbeat(args.engine)
+                result = {"ok": True}
+            elif args.action == "claim":
+                result = queue.claim(args.engine)
+                if result:
+                    result["content_base64"] = base64.b64encode(result.pop("data")).decode()
+            else:
+                value = json.loads(sys.stdin.read(3 * 1024 * 1024))
+                queue.finish(value["id"], value["claim_token"], result=value.get("result"), error=value.get("error"))
+                result = {"ok": True}
+            print(json.dumps(result))
+            return 0
+        if args.command == "analysis-worker":
+            from .analysis_worker import run_worker
+            run_worker(once=args.once)
+            return 0
         if args.command == "remnux":
             from .remnux import MAX_SAMPLE_BYTES, analyze_remnux
             with args.path.open("rb") as sample:

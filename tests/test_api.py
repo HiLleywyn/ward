@@ -130,6 +130,24 @@ class WardAPITests(unittest.TestCase):
             })
             self.assertNotIn("isError", response["result"])
 
+    def test_recent_scans_use_fifty_record_pages(self):
+        store = ResultStore(Path(self.temp.name) / "results.sqlite3")
+        for index in range(51):
+            store.record_repository_scan({"repository": "owner/repo", "status": "Unverified", "id": f"fixture-{index}"})
+        _, _, first = self.request("/api/scans?page=1")
+        _, _, second = self.request("/api/scans?page=2")
+        self.assertEqual(len(first["scans"]), 50)
+        self.assertEqual(len(second["scans"]), 1)
+        self.assertEqual(first["total"], 51)
+        self.assertEqual(first["pages"], 2)
+        self.assertFalse({item["id"] for item in first["scans"]} & {item["id"] for item in second["scans"]})
+
+    def test_behavioral_requests_fail_explicitly_when_windows_is_unavailable(self):
+        with self.assertRaises(HTTPError) as unavailable:
+            self.request("/api/v1/scans", method="POST", body={"kind": "repository", "url": "https://github.com/owner/repo", "analysis": "behavioral"})
+        self.assertEqual(unavailable.exception.code, 503)
+        self.assertEqual(json.loads(unavailable.exception.read())["error"]["code"], "windows_worker_unavailable")
+
     def test_errors_pagination_openapi_and_ssrf_rejection(self):
         document = openapi_document()
         self.assertEqual(document["openapi"], "3.1.0")

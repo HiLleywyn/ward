@@ -34,6 +34,13 @@
           <input id="repo-target" name="target" type="text" inputmode="url" autocomplete="off" placeholder="https://github.com/owner/repository" required>
           <button type="submit">Check repository</button>
         </div>
+        <label class="analysis-control" for="analysis-mode">Analysis
+          <select id="analysis-mode" name="analysis">
+            <option value="extended">Extended static</option>
+            <option value="static">Quick static</option>
+            <option value="behavioral" disabled>Windows behavior</option>
+          </select>
+        </label>
       </form>
       <div id="repo-loading" class="loading" hidden role="status">Cloning and inspecting files. Nothing will be run.</div>
       <div id="repo-result" class="scan-result" hidden aria-live="polite"></div>
@@ -46,6 +53,16 @@
           <p>Repository-specific evidence only.</p>
         </div>
       </div>
+      <form id="threat-filters" class="threat-filters" role="search" aria-label="Search malware records">
+        <label class="threat-search">Search<input id="threat-search" type="search" placeholder="Repository, family, file, or finding"></label>
+        <label>Family<select id="threat-family"><option value="">All families</option></select></label>
+        <label>File type<select id="threat-type"><option value="">All types</option></select></label>
+        <label>Recorded from<input id="threat-from" type="date"></label>
+        <label>To<input id="threat-to" type="date"></label>
+        <label>Sort<select id="threat-sort"><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="family">Family</option><option value="repository">Repository</option></select></label>
+        <button type="reset" class="quiet-button">Clear</button>
+      </form>
+      <p id="threat-count" class="filter-count" role="status"></p>
       <div id="known-threats" class="threat-groups" aria-live="polite">
         <p class="empty">Loading threat records...</p>
       </div>
@@ -62,6 +79,11 @@
       <div id="recent-scans" class="directory" aria-live="polite">
         <p class="empty">Loading scans...</p>
       </div>
+      <nav id="recent-pagination" class="pagination" aria-label="Recent scan pages" hidden>
+        <button type="button" id="recent-previous" class="quiet-button">Previous</button>
+        <span id="recent-page" role="status"></span>
+        <button type="button" id="recent-next" class="quiet-button">Next</button>
+      </nav>
     </section>
 
   </main>
