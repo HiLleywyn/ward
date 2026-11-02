@@ -12,7 +12,7 @@ from uuid import uuid4
 
 REMNUX_IMAGE = "ward-remnux:0.8.0"
 MAX_SAMPLE_BYTES = 32 * 1024 * 1024
-WORKER_TIMEOUT = 120
+WORKER_TIMEOUT = 200
 
 
 def analyze_remnux(data: bytes, *, expected_sha256: str | None = None) -> dict:
@@ -58,7 +58,7 @@ def analyze_remnux(data: bytes, *, expected_sha256: str | None = None) -> dict:
         if result.get("sha256") != digest:
             raise ValueError("REMnux returned evidence for a different artifact")
     except subprocess.TimeoutExpired as exc:
-        raise ValueError("REMnux analysis exceeded the 120 second limit") from exc
+        raise ValueError(f"REMnux analysis exceeded the {WORKER_TIMEOUT} second limit") from exc
     finally:
         # docker's client timeout does not stop the server-side container.
         subprocess.run(

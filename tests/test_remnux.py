@@ -2,7 +2,9 @@ import hashlib
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from ward.cli import build_parser
@@ -36,7 +38,7 @@ class RemnuxTests(unittest.TestCase):
             if command[1] == "run":
                 payload = json.loads(kwargs["input"])
                 self.assertEqual(payload["sha256"], digest)
-                self.assertEqual(kwargs["timeout"], 120)
+                self.assertEqual(kwargs["timeout"], 200)
                 return subprocess.CompletedProcess(command, 0, json.dumps({
                     "sha256": digest, "coverage": "partial", "engines": [{"name": "capa", "status": "timeout"}],
                 }), "")
@@ -65,11 +67,11 @@ class RemnuxTests(unittest.TestCase):
             if command[1:3] == ["image", "inspect"]:
                 return subprocess.CompletedProcess(command, 0, '[{"Id":"sha256:fixture"}]', "")
             if command[1] == "run":
-                raise subprocess.TimeoutExpired(command, 120)
+                raise subprocess.TimeoutExpired(command, 200)
             return subprocess.CompletedProcess(command, 0, "", "")
 
         with patch("ward.remnux.subprocess.run", side_effect=run) as mocked:
-            with self.assertRaisesRegex(ValueError, "120 second"):
+            with self.assertRaisesRegex(ValueError, "200 second"):
                 analyze_remnux(b"fixture")
         self.assertEqual(mocked.call_args_list[-1].args[0][1:3], ["rm", "--force"])
 
@@ -86,6 +88,28 @@ class RemnuxTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Worker runs inside Linux REMnux")
 class RemnuxWorkerTests(unittest.TestCase):
+    def test_timeout_preserves_completed_output(self):
+        from ward.remnux_worker import run_tool
+        result = run_tool("fixture", [sys.executable, "-c",
+                          "import time; print('sample: Test.Signature FOUND',flush=True); time.sleep(10)"], 1)
+        self.assertEqual(result["status"], "timeout")
+        self.assertIn("Test.Signature FOUND", result["output"])
+
+    def test_antivirus_match_before_timeout_keeps_partial_evidence(self):
+        from ward.remnux_worker import analyze
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "fixture.cvd"
+            database.write_bytes(b"ClamAV-VDB:01 Nov 2026:1:10:")
+            def tool(name, command, timeout):
+                return {"name": name, "status": "timeout" if name == "clamav" else "completed",
+                        "output": "sample: Test.Signature FOUND\n" if name == "clamav" else "text"}
+            with patch("ward.remnux_worker.Path.glob", return_value=[database]), patch("ward.remnux_worker.Path.write_bytes"), patch("ward.remnux_worker.run_tool", side_effect=tool):
+                report = analyze(b"harmless fixture")
+        antivirus = next(engine for engine in report["engines"] if engine["name"] == "clamav")
+        self.assertEqual(antivirus["status"], "partial")
+        self.assertEqual(antivirus["detections"], ["Test.Signature"])
+        self.assertEqual(report["coverage"], "partial")
+
     def test_packed_files_use_packer_analysis_and_keep_partial_coverage(self):
         from ward.remnux_worker import analyze
         data = b"MZ fixture MEI\x0c\x0b\x0a\x0b\x0e"

@@ -22,11 +22,12 @@ def run_tool(name, command, timeout):
     if shutil.which(command[0]) is None:
         return {"name": name, "status": "unavailable"}
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+        timed_out = False
         try:
             run = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=output,
                                  stderr=errors, timeout=timeout, check=False)
         except subprocess.TimeoutExpired:
-            return {"name": name, "status": "timeout"}
+            timed_out = True
         size = output.tell()
         output.seek(0)
         text = output.read(MAX_OUTPUT).decode("utf-8", errors="replace")
@@ -35,6 +36,8 @@ def run_tool(name, command, timeout):
         warnings = errors.read(2000).decode("utf-8", errors="replace").strip()
     if size >= MAX_OUTPUT or error_size >= MAX_OUTPUT:
         return {"name": name, "status": "partial", "detail": "Tool output reached its byte limit"}
+    if timed_out:
+        return {"name": name, "status": "timeout", "output": text, "warnings": warnings}
     if run.returncode:
         return {"name": name, "status": "failed", "exit_code": run.returncode,
                 "detail": (warnings or text or f"Tool exited with code {run.returncode}")[-2000:]}
@@ -56,14 +59,14 @@ def analyze(data):
     else:
         antivirus = run_tool("clamav", ["clamscan", "--no-summary", "--infected", "--stdout",
             "--max-filesize=32M", "--max-scansize=64M", "--max-files=1000", "--max-recursion=6",
-            "--alert-exceeds-max=yes", "--alert-encrypted=yes", "--max-scantime=20000", str(path)], 30)
+            "--alert-exceeds-max=yes", "--alert-encrypted=yes", "--max-scantime=60000", str(path)], 90)
+        lines = (antivirus.get("detail", "") + "\n" + antivirus.get("output", "")).splitlines()
+        antivirus["detections"] = [line.split(": ", 1)[-1].removesuffix(" FOUND") for line in lines if line.endswith(" FOUND")]
         if antivirus.get("exit_code") == 1:
-            lines = antivirus.get("detail", "").splitlines()
-            antivirus["detections"] = [line.split(": ", 1)[-1].removesuffix(" FOUND") for line in lines if line.endswith(" FOUND")]
             antivirus["status"] = "completed" if antivirus["detections"] else "failed"
             antivirus.pop("exit_code", None)
-        else:
-            antivirus["detections"] = []
+        elif antivirus["status"] == "timeout" and antivirus["detections"]:
+            antivirus["status"] = "partial"
         if any(value.startswith(("Heuristics.Limits.", "Heuristics.Encrypted.")) for value in antivirus["detections"]):
             antivirus["status"] = "partial"
         inventory = []
@@ -143,7 +146,7 @@ def main():
         raise TimeoutError("REMnux guest deadline exceeded")
 
     signal.signal(signal.SIGALRM, expired)
-    signal.alarm(110)
+    signal.alarm(190)
     # capa unpacks its trusted runtime libraries into scratch before analysis.
     resource.setrlimit(resource.RLIMIT_FSIZE, (128 * 1024 * 1024, 128 * 1024 * 1024))
     raw = sys.stdin.buffer.read(45 * 1024 * 1024 + 1)

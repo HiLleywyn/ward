@@ -45,6 +45,9 @@ Ward does not claim in-process coverage for them.
 The antivirus snapshot is limited to about 31 MiB including entry overhead and
 5,000 files. Omitted files are counted. Antivirus has its own expansion/time
 limits, so a completed static scan does not imply completed antivirus coverage.
+ClamAV receives up to 90 seconds including database loading, with a 60-second
+internal scan limit. The complete analysis child has a 200-second deadline;
+timed-out tools retain any completed detections and report partial coverage.
 Offline analysis cannot inspect later network payloads, determine every possible
 runtime behavior, or prove that software is safe. Linux/macOS binaries do not
 receive Windows behavioral execution.
