@@ -1,0 +1,48 @@
+name: Ward repository inspection
+description: Inspect the exact Git revision with Ward and link the evidence ledger
+branding:
+  icon: shield
+  color: yellow
+inputs:
+  ward-url:
+    description: Ward service base URL
+    default: https://ward.lley.cat
+  repository-url:
+    description: Public HTTPS Git repository URL
+    default: ${{ github.server_url }}/${{ github.repository }}
+  ref:
+    description: Branch or tag to inspect
+    default: ${{ github.head_ref || github.ref_name }}
+  expected-commit:
+    description: Exact commit that the inspected ref must resolve to
+    default: ${{ github.sha }}
+  timeout-seconds:
+    description: Maximum time to wait for Ward
+    default: "180"
+outputs:
+  scan-id:
+    description: Ward scan identifier
+    value: ${{ steps.scan.outputs.scan-id }}
+  verdict:
+    description: Ward verdict
+    value: ${{ steps.scan.outputs.verdict }}
+  record-url:
+    description: Human-readable evidence record
+    value: ${{ steps.scan.outputs.record-url }}
+  badge-markdown:
+    description: README badge Markdown linked to the repository ledger
+    value: ${{ steps.scan.outputs.badge-markdown }}
+runs:
+  using: composite
+  steps:
+    - id: scan
+      name: Inspect repository with Ward
+      shell: bash
+      env:
+        WARD_URL: ${{ inputs.ward-url }}
+        WARD_REPOSITORY_URL: ${{ inputs.repository-url }}
+        WARD_REF: ${{ inputs.ref }}
+        WARD_EXPECTED_COMMIT: ${{ inputs.expected-commit }}
+        WARD_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+        WARD_IDEMPOTENCY_KEY: github:${{ github.repository_id }}:${{ github.sha }}
+      run: python "$GITHUB_ACTION_PATH/ward_scan.py"

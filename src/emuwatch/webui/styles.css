@@ -164,6 +164,26 @@ details[open] > summary .chevron { transform: rotate(180deg); }
 .scan-meta strong { color: var(--text); font-size: .84rem; }
 .commit, .finding-path, .finding-hash, .evidence-first code { color: #c6c0b5; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
 .commit { font-size: .72rem; }
+.revision { display: flex; flex-wrap: wrap; gap: 7px; }
+.branch { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .72rem; overflow-wrap: anywhere; }
+.scan-history { margin-top: 10px; padding: 9px 10px; border-left: 2px solid var(--accent); background: rgba(224, 183, 92, .06); }
+.scan-history strong { font-size: .76rem; }
+.scan-history p { margin: 4px 0 0; color: var(--muted); font-size: .76rem; }
+.record-page { width: min(880px, calc(100% - 28px)); }
+.record-header { margin-bottom: 18px; }
+.record-header > a { color: var(--accent); font-weight: 800; text-decoration: none; }
+.record-header h1 { margin: 8px 0 0; font-size: clamp(1.65rem, 5vw, 2.7rem); }
+.record-card { margin-bottom: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(18, 17, 15, .88); }
+.record-card h2 { margin: 0 0 10px; font-size: 1rem; }
+.record-card > summary { cursor: pointer; font-weight: 800; }
+.record-card pre { max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #c6c0b5; font-size: .75rem; }
+.record-facts { display: grid; grid-template-columns: minmax(90px, .35fr) 1fr; gap: 8px 14px; margin: 0; }
+.record-facts dt { color: var(--muted); font-size: .76rem; font-weight: 700; }
+.record-facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.record-findings, .ledger-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.record-findings li, .ledger-list li { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.record-findings code, .ledger-list code { color: #c6c0b5; overflow-wrap: anywhere; }
+.record-findings p, .ledger-list span { margin: 0; color: var(--muted); font-size: .78rem; }
 .findings { display: grid; gap: 8px; margin: 13px 0 0; padding: 0; list-style: none; }
 .finding { padding: 11px 12px; border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 9px; background: var(--panel); }
 .finding.severity-critical, .finding.severity-high { border-left-color: var(--danger); }

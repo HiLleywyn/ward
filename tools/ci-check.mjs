@@ -104,9 +104,34 @@ check('homepage hierarchy stays compact', () => {
 
 check('scanner API wiring stays present', () => {
   const script = read('src/emuwatch/webui/app.js');
-  assert(script.includes('/api/scan-repo'), 'repository scan endpoint is missing');
+  assert(script.includes('/api/v1/scans'), 'repository scan endpoint is missing');
   assert(script.includes('/api/scans'), 'recent scan endpoint is missing');
   assert(!script.includes('/api/campaigns'), 'standalone research feed returned');
+});
+
+check('OpenAPI contract covers implemented resources', () => {
+  const document = json('src/emuwatch/openapi.json');
+  assert(document.openapi === '3.1.0', 'OpenAPI must use version 3.1.0');
+  for (const route of [
+    '/api/v1/scans', '/api/v1/scans/{scan_id}', '/api/v1/scans/{scan_id}/events',
+    '/api/v1/repositories/history', '/api/v1/comparisons', '/api/v1/malware-records',
+    '/api/v1/artifacts/{sha256}', '/api/v1/reports/{scan_id}',
+    '/api/v1/badges/{owner}/{repository}.svg', '/mcp',
+  ]) {
+    assert(document.paths[route], `OpenAPI route is missing: ${route}`);
+  }
+});
+
+check('Ward plugin package is portable and secret-free', () => {
+  const plugin = json('integrations/ward-plugin/plugin.json');
+  const mcp = json('integrations/ward-plugin/mcp.json');
+  const skill = read('integrations/ward-plugin/skills/ward-scanner/SKILL.md');
+  assert(plugin.$schema === 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json', 'plugin schema is invalid');
+  assert(plugin.extensions?.['com.openai']?.interface?.shortDescription?.length <= 30, 'plugin subtitle exceeds 30 characters');
+  assert(mcp.$schema === 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json', 'MCP schema is invalid');
+  assert(mcp.mcpServers?.ward?.url === 'https://ward.lley.cat/mcp', 'MCP endpoint is incorrect');
+  assert(skill.startsWith('---\nname: ward-scanner\n'), 'Ward skill frontmatter is invalid');
+  assert(!/token|password|secret\s*[:=]\s*\S+/i.test(JSON.stringify({plugin, mcp})), 'plugin package may contain a credential');
 });
 
 check('responsive accessibility styles stay present', () => {

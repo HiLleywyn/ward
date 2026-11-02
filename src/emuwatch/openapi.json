@@ -1,0 +1,227 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Ward API",
+    "version": "1.0.0",
+    "description": "Bounded malware analysis for public Git repositories, files, and SHA-256 values. An unknown verdict never means safe."
+  },
+  "servers": [{"url": "https://ward.lley.cat"}],
+  "tags": [
+    {"name": "Scans"},
+    {"name": "Artifacts"},
+    {"name": "Reports"},
+    {"name": "Protocol"}
+  ],
+  "paths": {
+    "/api/v1": {
+      "get": {
+        "tags": ["Protocol"],
+        "summary": "Describe the API",
+        "responses": {"200": {"description": "API discovery document", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": ["Protocol"],
+        "summary": "Retrieve the OpenAPI contract",
+        "responses": {"200": {"description": "OpenAPI 3.1 document", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/api/v1/scans": {
+      "get": {
+        "tags": ["Scans"],
+        "summary": "List scans",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+          {"name": "cursor", "in": "query", "schema": {"type": "string"}},
+          {"name": "status", "in": "query", "schema": {"$ref": "#/components/schemas/ScanStatus"}}
+        ],
+        "responses": {
+          "200": {"description": "A page of scans", "content": {"application/json": {"schema": {"type": "object", "required": ["items", "next_cursor"], "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/Scan"}}, "next_cursor": {"type": ["string", "null"]}}}}}},
+          "400": {"$ref": "#/components/responses/Error"}
+        }
+      },
+      "post": {
+        "tags": ["Scans"],
+        "summary": "Submit a scan",
+        "description": "Returns immediately and processes the scan in Ward's bounded worker. File contents are transient and are not stored.",
+        "parameters": [{"name": "Idempotency-Key", "in": "header", "schema": {"type": "string", "minLength": 1, "maxLength": 128}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanSubmission"}}}},
+        "responses": {
+          "202": {"description": "Scan accepted", "headers": {"Location": {"schema": {"type": "string"}}, "X-Ward-Cancel-Token": {"description": "Returned only for a newly created job. Store it if cancellation is needed.", "schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Scan"}}}},
+          "200": {"description": "Existing idempotent submission", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Scan"}}}},
+          "400": {"$ref": "#/components/responses/Error"},
+          "413": {"$ref": "#/components/responses/Error"},
+          "422": {"$ref": "#/components/responses/Error"},
+          "429": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/api/v1/scans/{scan_id}": {
+      "parameters": [{"$ref": "#/components/parameters/ScanId"}],
+      "get": {
+        "tags": ["Scans"],
+        "summary": "Retrieve a scan",
+        "responses": {"200": {"description": "Scan state", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Scan"}}}}, "404": {"$ref": "#/components/responses/Error"}}
+      },
+      "delete": {
+        "tags": ["Scans"],
+        "summary": "Cancel a queued scan",
+        "parameters": [{"name": "X-Ward-Cancel-Token", "in": "header", "required": true, "schema": {"type": "string"}}],
+        "responses": {
+          "200": {"description": "Cancelled or already terminal scan", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Scan"}}}},
+          "401": {"$ref": "#/components/responses/Error"},
+          "403": {"$ref": "#/components/responses/Error"},
+          "404": {"$ref": "#/components/responses/Error"},
+          "409": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/api/v1/scans/{scan_id}/events": {
+      "get": {
+        "tags": ["Scans"],
+        "summary": "Follow scan state with server-sent events",
+        "parameters": [{"$ref": "#/components/parameters/ScanId"}],
+        "responses": {"200": {"description": "SSE scan state stream", "content": {"text/event-stream": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/api/v1/repositories/history": {
+      "get": {
+        "tags": ["Scans"],
+        "summary": "Retrieve a repository scan ledger",
+        "description": "Returns chronological scans, observed transitions, and other scanned repositories sharing an exact commit.",
+        "parameters": [{"name": "target", "in": "query", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Repository history", "content": {"application/json": {"schema": {"type": "object"}}}}, "400": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/api/v1/comparisons": {
+      "get": {
+        "tags": ["Scans"],
+        "summary": "Compare two completed repository scans",
+        "parameters": [
+          {"name": "base_scan", "in": "query", "required": true, "schema": {"type": "string", "format": "uuid"}},
+          {"name": "head_scan", "in": "query", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "responses": {"200": {"description": "Finding and verdict differences", "content": {"application/json": {"schema": {"type": "object"}}}}, "404": {"$ref": "#/components/responses/Error"}, "422": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/api/v1/malware-records": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "List reviewed malware records",
+        "responses": {"200": {"description": "Curated source-backed records", "content": {"application/json": {"schema": {"type": "object", "properties": {"items": {"type": "array", "items": {"type": "object"}}}}}}}}
+      }
+    },
+    "/api/v1/malware-records/{record_id}": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Retrieve one reviewed malware record",
+        "parameters": [{"name": "record_id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Curated source-backed record", "content": {"application/json": {"schema": {"type": "object"}}}}, "404": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/api/v1/reports/{scan_id}": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Retrieve a standardized report",
+        "parameters": [{"$ref": "#/components/parameters/ScanId"}],
+        "responses": {
+          "200": {"description": "Terminal scan report", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Report"}}}},
+          "404": {"$ref": "#/components/responses/Error"},
+          "409": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/api/v1/artifacts/{sha256}": {
+      "get": {
+        "tags": ["Artifacts"],
+        "summary": "Retrieve reviewed public artifact evidence",
+        "description": "Private file submissions are never exposed or deduplicated through this endpoint.",
+        "parameters": [{"name": "sha256", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}],
+        "responses": {"200": {"description": "Public artifact evidence", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Artifact"}}}}, "404": {"$ref": "#/components/responses/Error"}, "422": {"$ref": "#/components/responses/Error"}}
+      }
+    },
+    "/api/v1/badges/{owner}/{repository}.svg": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Render the latest repository inspection badge",
+        "description": "The badge is branch-aware and links naturally with the human repository ledger. Inspected never means proven safe.",
+        "parameters": [
+          {"name": "owner", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "repository", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "branch", "in": "query", "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Dynamic SVG badge", "content": {"image/svg+xml": {"schema": {"type": "string"}}}}}
+      }
+    },
+    "/mcp": {
+      "post": {
+        "tags": ["Protocol"],
+        "summary": "Use Ward over stateless MCP Streamable HTTP",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
+        "responses": {"200": {"description": "JSON-RPC response", "content": {"application/json": {"schema": {"type": "object"}}}}, "202": {"description": "Notification accepted"}}
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "ScanId": {"name": "scan_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+    },
+    "responses": {
+      "Error": {"description": "Predictable error envelope", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+    },
+    "schemas": {
+      "ScanStatus": {"type": "string", "enum": ["queued", "running", "completed", "failed", "cancelled", "incomplete"]},
+      "ScanSubmission": {
+        "oneOf": [
+          {"type": "object", "required": ["kind", "url"], "properties": {"kind": {"const": "repository"}, "url": {"type": "string", "format": "uri"}, "ref": {"type": "string", "maxLength": 200}, "expected_commit": {"type": "string", "pattern": "^[A-Fa-f0-9]{40,64}$"}}, "additionalProperties": false},
+          {"type": "object", "required": ["kind", "sha256"], "properties": {"kind": {"const": "sha256"}, "sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}}, "additionalProperties": false},
+          {"type": "object", "required": ["kind", "filename", "content_base64"], "properties": {"kind": {"const": "file"}, "filename": {"type": "string"}, "content_base64": {"type": "string", "contentEncoding": "base64"}}, "additionalProperties": false}
+        ]
+      },
+      "Scan": {
+        "type": "object",
+        "required": ["id", "created_at", "updated_at", "kind", "target", "status", "progress", "links"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "kind": {"type": "string", "enum": ["repository", "file", "sha256"]},
+          "target": {"type": "string"},
+          "status": {"$ref": "#/components/schemas/ScanStatus"},
+          "progress": {"type": "integer", "minimum": 0, "maximum": 100},
+          "result": {"type": ["object", "null"]},
+          "error_code": {"type": ["string", "null"]},
+          "error_message": {"type": ["string", "null"]},
+          "links": {"type": "object", "additionalProperties": {"type": "string"}}
+        }
+      },
+      "Report": {
+        "type": "object",
+        "required": ["id", "scan_id", "created_at", "verdict", "engines", "evidence", "limitations"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "scan_id": {"type": "string", "format": "uuid"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "completed_at": {"type": ["string", "null"], "format": "date-time"},
+          "verdict": {"type": "object", "required": ["status", "confidence"], "properties": {"status": {"type": "string", "enum": ["malicious", "suspicious", "unknown", "incomplete"]}, "confidence": {"type": "number", "minimum": 0, "maximum": 1}}},
+          "engines": {"type": "array", "items": {"type": "object"}},
+          "evidence": {"type": "object"},
+          "artifact": {"type": ["object", "null"]},
+          "limitations": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "Artifact": {
+        "type": "object",
+        "required": ["sha256", "indicator", "analysis_history"],
+        "properties": {"sha256": {"type": "string"}, "indicator": {"type": "object"}, "analysis_history": {"type": "array", "items": {"type": "object"}}}
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {"error": {"type": "object", "required": ["code", "message", "request_id"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "request_id": {"type": "string", "format": "uuid"}}}}
+      }
+    }
+  }
+}

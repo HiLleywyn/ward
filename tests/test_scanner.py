@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -9,7 +10,7 @@ from pathlib import Path
 
 from unittest.mock import patch
 
-from emuwatch.scanner import ScanError, _git_environment, inspect_tree, normalize_repository_url
+from emuwatch.scanner import ScanError, _git_environment, inspect_tree, normalize_repository_url, scan_repository
 
 
 class RepositoryUrlTests(unittest.TestCase):
@@ -45,6 +46,42 @@ class RepositoryUrlTests(unittest.TestCase):
         ):
             with self.subTest(value=value), self.assertRaises(ScanError):
                 normalize_repository_url(value, resolve=False)
+
+    def test_invalid_branch_names_are_rejected(self):
+        from emuwatch.scanner import normalize_git_ref
+        for value in ("--upload-pack=evil", "../main", "refs//heads/main", "main.lock"):
+            with self.subTest(value=value), self.assertRaises(ScanError):
+                normalize_git_ref(value)
+
+    def test_clone_is_pinned_to_the_validated_public_address(self):
+        commands = []
+
+        def run(command, **kwargs):
+            commands.append(command)
+            if "clone" in command:
+                Path(command[-1]).mkdir(parents=True)
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return subprocess.CompletedProcess(command, 0, "a" * 40 + "\n", "")
+
+        address = (None, None, None, None, ("93.184.216.34", 443))
+        with patch("emuwatch.scanner.socket.getaddrinfo", return_value=[address]):
+            with patch("emuwatch.scanner.subprocess.run", side_effect=run):
+                result = scan_repository("https://example.com/team/repository.git")
+        self.assertEqual(result["status"], "Unverified")
+        self.assertIn("http.curloptResolve=+example.com:443:93.184.216.34", commands[0])
+
+    def test_expected_commit_prevents_branch_race(self):
+        def run(command, **kwargs):
+            if "clone" in command:
+                Path(command[-1]).mkdir(parents=True)
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return subprocess.CompletedProcess(command, 0, "a" * 40 + "\n", "")
+
+        address = (None, None, None, None, ("93.184.216.34", 443))
+        with patch("emuwatch.scanner.socket.getaddrinfo", return_value=[address]):
+            with patch("emuwatch.scanner.subprocess.run", side_effect=run):
+                with self.assertRaisesRegex(ScanError, "ref changed"):
+                    scan_repository("https://example.com/team/repository.git", expected_commit="b" * 40)
 
 
 class StaticInspectionTests(unittest.TestCase):

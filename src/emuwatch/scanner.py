@@ -26,6 +26,8 @@ MAX_FILE_BYTES = 32 * 1024 * 1024
 MAX_HASH_BYTES = 128 * 1024 * 1024
 MAX_TEXT_BYTES = 2 * 1024 * 1024
 CLONE_TIMEOUT_SECONDS = 60
+REF_PATTERN = re.compile(r"^[A-Za-z0-9._/-]{1,200}$")
+COMMIT_PATTERN = re.compile(r"^[A-Fa-f0-9]{40,64}$")
 
 TEXT_SUFFIXES = {
     ".bat", ".cmd", ".conf", ".cs", ".go", ".html", ".ini", ".java", ".js",
@@ -85,6 +87,26 @@ class ScanError(ValueError):
     pass
 
 
+def normalize_git_ref(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ScanError("Repository ref must be a string")
+    if not value.strip():
+        return None
+    ref = value.strip()
+    if (
+        not REF_PATTERN.fullmatch(ref)
+        or ref.startswith(("-", ".", "/"))
+        or ref.endswith(("/", ".", ".lock"))
+        or ".." in ref
+        or "//" in ref
+        or "@{" in ref
+    ):
+        raise ScanError("Repository ref is not a valid branch or tag name")
+    return ref
+
+
 def _git_environment(home: Path) -> dict[str, str]:
     runtime_keys = (
         "PATH", "SystemRoot", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT",
@@ -98,6 +120,16 @@ def _git_environment(home: Path) -> dict[str, str]:
         "GIT_LFS_SKIP_SMUDGE": "1",
     })
     return environment
+
+
+def _global_addresses(hostname: str) -> list[str]:
+    try:
+        addresses = {item[4][0] for item in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)}
+    except socket.gaierror as exc:
+        raise ScanError("Repository host could not be resolved") from exc
+    if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+        raise ScanError("Repository host resolves to a local or private network")
+    return sorted(addresses, key=lambda address: (ipaddress.ip_address(address).version, address))
 
 
 def normalize_repository_url(value: str, *, resolve: bool = True) -> str:
@@ -126,12 +158,7 @@ def normalize_repository_url(value: str, *, resolve: bool = True) -> str:
     if literal is not None and not literal.is_global:
         raise ScanError("Local and private network repositories are not supported")
     if resolve:
-        try:
-            addresses = {item[4][0] for item in socket.getaddrinfo(parsed.hostname, 443, type=socket.SOCK_STREAM)}
-        except socket.gaierror as exc:
-            raise ScanError("Repository host could not be resolved") from exc
-        if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
-            raise ScanError("Repository host resolves to a local or private network")
+        _global_addresses(parsed.hostname)
     path = re.sub(r"/+", "/", parsed.path).rstrip("/")
     if not path or path == "/":
         raise ScanError("Repository URL must include a repository path")
@@ -314,9 +341,15 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
     }
 
 
-def scan_repository(value: str) -> dict:
+def scan_repository(value: str, ref: str | None = None, expected_commit: str | None = None) -> dict:
     started = time.monotonic()
-    url = normalize_repository_url(value)
+    ref = normalize_git_ref(ref)
+    if expected_commit is not None and not COMMIT_PATTERN.fullmatch(expected_commit):
+        raise ScanError("Expected commit must be a 40 to 64 character hexadecimal object ID")
+    url = normalize_repository_url(value, resolve=False)
+    hostname = urlparse(url).hostname
+    address = _global_addresses(hostname)[0]
+    pinned_address = f"[{address}]" if ipaddress.ip_address(address).version == 6 else address
     label = _repository_label(url)
     with tempfile.TemporaryDirectory(prefix="ward-scan-") as temporary:
         temporary_path = Path(temporary)
@@ -324,9 +357,13 @@ def scan_repository(value: str) -> dict:
         environment = _git_environment(temporary_path)
         command = [
             "git", "-c", "protocol.file.allow=never", "-c", "protocol.ext.allow=never",
-            "-c", "http.followRedirects=false", "clone", "--depth", "1", "--no-tags",
-            "--single-branch", "--filter=blob:limit=4194304", url, str(checkout),
+            "-c", "http.followRedirects=false",
+            "-c", f"http.curloptResolve=+{hostname}:443:{pinned_address}",
+            "clone", "--depth", "1", "--no-tags", "--single-branch",
         ]
+        if ref:
+            command.extend(["--branch", ref])
+        command.extend(["--filter=blob:limit=4194304", url, str(checkout)])
         try:
             completed = subprocess.run(
                 command,
@@ -356,6 +393,20 @@ def scan_repository(value: str) -> dict:
             ).stdout.strip()
         except (subprocess.SubprocessError, OSError) as exc:
             raise ScanError("Repository commit could not be recorded") from exc
+        if expected_commit and commit.lower() != expected_commit.lower():
+            raise ScanError("Repository ref changed before Ward could inspect the expected commit; run the check again")
+        try:
+            branch = subprocess.run(
+                ["git", "-C", str(checkout), "rev-parse", "--abbrev-ref", "HEAD"],
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=5,
+                check=True,
+            ).stdout.strip()
+        except (subprocess.SubprocessError, OSError) as exc:
+            raise ScanError("Repository branch could not be recorded") from exc
         inspected = inspect_tree(checkout)
     warning = repository_warning(_github_target(url)) if _github_target(url) else None
     exact_matches = sum(1 for item in inspected["findings"] if item["kind"] == "known-malware-hash")
@@ -380,12 +431,27 @@ def scan_repository(value: str) -> dict:
         "repository": label,
         "repository_url": url,
         "commit": commit,
+        "expected_commit": expected_commit,
+        "branch": branch,
         "status": status,
         "scanned_at": datetime.now(timezone.utc).isoformat(),
         "duration_ms": round((time.monotonic() - started) * 1000),
         "summary": {key: inspected[key] for key in ("files", "bytes", "hashed_bytes", "text_files", "archives", "executable_files", "truncated")},
         "findings": inspected["findings"],
         "sources": sources,
+        "verification": {
+            "level": "partial" if inspected["truncated"] else "inspected",
+            "checks": [
+                {"name": "revision-pinned", "status": "completed"},
+                {"name": "file-inventory", "status": "partial" if inspected["truncated"] else "completed"},
+                {"name": "sha256-inventory", "status": "partial" if inspected["truncated"] else "completed"},
+                {"name": "known-indicators", "status": "completed"},
+                {"name": "static-rules", "status": "partial" if inspected["truncated"] else "completed"},
+                {"name": "bounded-archive-inspection", "status": "completed"},
+                {"name": "isolated-build", "status": "not-run"},
+                {"name": "behavioral-analysis", "status": "not-run"},
+            ],
+        },
         "limitations": [
             "Ward cloned and inspected repository files but did not execute code, installers, build scripts, or package hooks.",
             "No known indicator match does not prove that a repository is safe.",

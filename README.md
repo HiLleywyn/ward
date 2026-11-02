@@ -2,6 +2,10 @@
 
 Public site: [ward.lley.cat](https://ward.lley.cat)
 
+Developer interfaces: [REST API and MCP](docs/API.md) · [OpenAPI 3.1](https://ward.lley.cat/api/v1/openapi.json)
+
+Repository maintainers can add the [Ward GitHub Action and linked README badge](docs/GITHUB-ACTION.md). The action binds each inspection to the exact workflow commit and publishes the result in Ward's repository ledger. [Verification tiers](docs/VERIFICATION-TIERS.md) define what each badge actually proves.
+
 [Reviewed results and status history](docs/RESULTS.md) records 25 historical
 repository warnings named by primary security research and 12 confirmed
 SHA-256 indicators. The public malware database is stricter: it currently has
@@ -17,6 +21,11 @@ Ward clones public HTTPS Git repositories into a constrained container, records
 the exact commit, hashes bounded files, inspects scripts and small archives, and
 compares content against an evidence-backed malware indicator registry. It does
 not execute repository code, installers, build scripts, or package hooks.
+
+Completed results include an evidence digest and verification tier. `Inspected`
+means Ward completed its configured static checks for that exact revision. It is
+not a promise that the software is safe. Ward will reserve `Verified` for a future
+isolated build and behavioral-analysis tier running outside the web-service host.
 
 The public interface keeps every completed repository scan in a recent-scan
 directory. A scan without a match is `Unverified`, never a safety guarantee.

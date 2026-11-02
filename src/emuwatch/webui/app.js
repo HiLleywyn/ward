@@ -117,7 +117,28 @@ function scanDetails(scan, expanded = false) {
     metadata.append(metric);
   }
   const commit = textElement('code', 'commit', `commit ${String(scan.commit || 'unavailable').slice(0, 12)}`);
-  body.append(metadata, commit);
+  const revision = document.createElement('div');
+  revision.className = 'revision';
+  revision.append(commit);
+  if (scan.branch) revision.append(textElement('code', 'branch', `branch ${scan.branch}`));
+  body.append(metadata, revision);
+
+  if (scan.history?.scan_count > 1 || scan.history?.related_repositories?.length) {
+    const history = document.createElement('div');
+    history.className = 'scan-history';
+    history.append(textElement(
+      'strong', '',
+      `${scan.history.scan_count} recorded scans · ${scan.history.transitions.length} observed changes · ${scan.history.related_repositories.length} shared-commit relatives`,
+    ));
+    const latest = scan.history.transitions.at(-1);
+    if (latest) {
+      history.append(textElement(
+        'p', '',
+        `${latest.from_status} at ${String(latest.base_commit || 'unknown').slice(0, 12)} to ${latest.to_status} at ${String(latest.head_commit || 'unknown').slice(0, 12)}. ${latest.new_findings.length} new finding(s).`,
+      ));
+    }
+    body.append(history);
+  }
 
   if (scan.findings?.length) {
     const list = document.createElement('ul');
@@ -267,13 +288,24 @@ repoForm.addEventListener('submit', async event => {
   repoForm.setAttribute('aria-busy', 'true');
   button.disabled = true;
   try {
-    const response = await fetch('/api/scan-repo', {
+    const response = await fetch('/api/v1/scans', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({target: repoInput.value}),
+      body: JSON.stringify({kind: 'repository', url: repoInput.value}),
     });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'The scanner returned an error.');
+    let job = await response.json();
+    if (!response.ok) throw new Error(job.error?.message || 'The scanner returned an error.');
+    const deadline = Date.now() + 90000;
+    while (!['completed', 'failed', 'cancelled', 'incomplete'].includes(job.status) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 750));
+      const state = await fetch(job.links.self);
+      job = await state.json();
+      if (!state.ok) throw new Error(job.error?.message || 'The scan status is unavailable.');
+    }
+    if (job.status !== 'completed') {
+      throw new Error(job.error_message || (Date.now() >= deadline ? 'The scan did not finish within 90 seconds.' : 'The scan did not complete.'));
+    }
+    const result = job.result;
     repoResult.replaceChildren(scanDetails(result, true));
     repoResult.className = 'scan-result';
     repoResult.hidden = false;

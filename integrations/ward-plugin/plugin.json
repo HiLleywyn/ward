@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "ward",
+  "version": "0.1.0",
+  "description": "Scan public Git repositories and SHA-256 values with Ward's evidence-first malware analysis.",
+  "homepage": "https://ward.lley.cat",
+  "repository": "https://github.com/HiLleywyn/ward",
+  "license": "MIT",
+  "author": {"name": "Lleywyn"},
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Ward",
+        "shortDescription": "Scan Git repos for malware",
+        "longDescription": "Submit bounded Ward scans, retrieve evidence-based reports, and look up reviewed public malware indicators.",
+        "developerName": "Lleywyn",
+        "capabilities": ["Tools"],
+        "defaultPrompt": "Check this public Git repository with Ward and explain the evidence without calling an unknown result safe."
+      }
+    }
+  }
+}

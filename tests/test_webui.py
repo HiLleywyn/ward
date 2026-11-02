@@ -23,7 +23,7 @@ class WebInterfaceTests(unittest.TestCase):
             with self.subTest(obsolete=obsolete):
                 self.assertNotIn(obsolete, page)
         self.assertNotIn("/api/campaigns", script)
-        self.assertIn("/api/scan-repo", script)
+        self.assertIn("/api/v1/scans", script)
         self.assertIn("/api/scans", script)
 
     def test_responsive_and_reduced_motion_styles_remain(self):

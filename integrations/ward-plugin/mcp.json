@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "ward": {
+      "type": "streamable-http",
+      "url": "https://ward.lley.cat/mcp",
+      "extensions": {"com.openai": {"auth": {"type": "none"}}}
+    }
+  }
+}

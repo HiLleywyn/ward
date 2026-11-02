@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hmac
+import hashlib
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -58,6 +60,36 @@ class ResultStore:
                 status TEXT NOT NULL CHECK(status IN ('PASS','FAIL','UNKNOWN')),
                 kind TEXT NOT NULL, payload TEXT NOT NULL
             )""")
+            connection.execute("""CREATE TABLE IF NOT EXISTS scan_jobs (
+                id TEXT PRIMARY KEY, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                kind TEXT NOT NULL CHECK(kind IN ('repository','file','sha256')),
+                target TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN
+                    ('queued','running','completed','failed','cancelled','incomplete')),
+                progress INTEGER NOT NULL CHECK(progress BETWEEN 0 AND 100),
+                request_hash TEXT NOT NULL, idempotency_key TEXT UNIQUE,
+                cancel_token_hash TEXT NOT NULL, result TEXT,
+                error_code TEXT, error_message TEXT, requested_ref TEXT
+            )""")
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(scan_jobs)")}
+            if "requested_ref" not in columns:
+                connection.execute("ALTER TABLE scan_jobs ADD COLUMN requested_ref TEXT")
+            legacy = connection.execute(
+                "SELECT id, recorded_at, target, payload FROM observations WHERE kind = 'repository-scan'"
+            ).fetchall()
+            for scan_id, recorded_at, target, payload in legacy:
+                result = json.loads(payload)
+                canonical_target = result.get("repository_url") or target
+                connection.execute(
+                    "INSERT OR IGNORE INTO scan_jobs "
+                    "(id, created_at, updated_at, kind, target, status, progress, request_hash, idempotency_key, cancel_token_hash, result, error_code, error_message, requested_ref) "
+                    "VALUES (?, ?, ?, 'repository', ?, 'completed', 100, ?, NULL, ?, ?, NULL, NULL, ?)",
+                    (
+                        scan_id, recorded_at, recorded_at, canonical_target,
+                        hashlib.sha256(f"legacy:{scan_id}".encode()).hexdigest(),
+                        hashlib.sha256(f"legacy-cancel:{scan_id}".encode()).hexdigest(),
+                        payload, result.get("branch"),
+                    ),
+                )
 
     @contextmanager
     def connect(self):
@@ -99,6 +131,313 @@ class ResultStore:
                 json.dumps(payload, sort_keys=True),
             ))
         return record_id
+
+    @staticmethod
+    def _scan_job(row: tuple | None, *, include_private: bool = False) -> dict | None:
+        if row is None:
+            return None
+        fields = (
+            "id", "created_at", "updated_at", "kind", "target", "status",
+            "progress", "request_hash", "idempotency_key", "cancel_token_hash",
+            "result", "error_code", "error_message", "requested_ref",
+        )
+        value = dict(zip(fields, row))
+        if value["result"]:
+            value["result"] = json.loads(value["result"])
+        if not include_private:
+            value.pop("request_hash")
+            value.pop("idempotency_key")
+            value.pop("cancel_token_hash")
+        return value
+
+    def create_scan_job(
+        self,
+        *,
+        kind: str,
+        target: str,
+        request_hash: str,
+        idempotency_key: str | None,
+        cancel_token_hash: str,
+        requested_ref: str | None = None,
+    ) -> tuple[dict, bool]:
+        now = datetime.now(timezone.utc).isoformat()
+        scan_id = str(uuid4())
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if idempotency_key:
+                existing = connection.execute(
+                    "SELECT * FROM scan_jobs WHERE idempotency_key = ?", (idempotency_key,)
+                ).fetchone()
+                if existing:
+                    job = self._scan_job(existing, include_private=True)
+                    if not hmac.compare_digest(job["request_hash"], request_hash):
+                        raise ValueError("The idempotency key was already used for a different request")
+                    return self._scan_job(existing), False
+            connection.execute(
+                "INSERT INTO scan_jobs "
+                "(id, created_at, updated_at, kind, target, status, progress, request_hash, idempotency_key, cancel_token_hash, result, error_code, error_message, requested_ref) "
+                "VALUES (?, ?, ?, ?, ?, 'queued', 0, ?, ?, ?, NULL, NULL, NULL, ?)",
+                (scan_id, now, now, kind, target, request_hash, idempotency_key, cancel_token_hash, requested_ref),
+            )
+            row = connection.execute("SELECT * FROM scan_jobs WHERE id = ?", (scan_id,)).fetchone()
+        return self._scan_job(row), True
+
+    def scan_job(self, scan_id: str) -> dict | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM scan_jobs WHERE id = ?", (scan_id,)).fetchone()
+        return self._scan_job(row)
+
+    def list_scan_jobs(
+        self,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+        status: str | None = None,
+        public_only: bool = True,
+    ) -> tuple[list[dict], str | None]:
+        if not 1 <= limit <= 100:
+            raise ValueError("Limit must be between 1 and 100")
+        if status and status not in {"queued", "running", "completed", "failed", "cancelled", "incomplete"}:
+            raise ValueError("Unknown scan status")
+        before_rowid = None
+        with self.connect() as connection:
+            if cursor:
+                cursor_row = connection.execute("SELECT rowid FROM scan_jobs WHERE id = ?", (cursor,)).fetchone()
+                if cursor_row is None:
+                    raise ValueError("Invalid cursor")
+                before_rowid = cursor_row[0]
+            clauses = []
+            values: list[object] = []
+            if public_only:
+                clauses.append("kind = 'repository'")
+            if before_rowid is not None:
+                clauses.append("rowid < ?")
+                values.append(before_rowid)
+            if status:
+                clauses.append("status = ?")
+                values.append(status)
+            where = " WHERE " + " AND ".join(clauses) if clauses else ""
+            rows = connection.execute(
+                f"SELECT * FROM scan_jobs{where} ORDER BY rowid DESC LIMIT ?", (*values, limit + 1)
+            ).fetchall()
+        next_cursor = rows[limit - 1][0] if len(rows) > limit else None
+        return [self._scan_job(row) for row in rows[:limit]], next_cursor
+
+    def start_scan_job(self, scan_id: str) -> bool:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE scan_jobs SET status = 'running', progress = 10, updated_at = ? "
+                "WHERE id = ? AND status = 'queued'", (now, scan_id),
+            )
+        return cursor.rowcount == 1
+
+    def complete_scan_job(self, scan_id: str, result: dict, *, publish_repository: bool = False) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE scan_jobs SET status = 'completed', progress = 100, updated_at = ?, "
+                "result = ?, error_code = NULL, error_message = NULL WHERE id = ? AND status = 'running'",
+                (now, json.dumps(result, sort_keys=True), scan_id),
+            )
+            if publish_repository and cursor.rowcount == 1:
+                status = "FAIL" if result.get("status") in {"Malicious", "Corroborated"} else "UNKNOWN"
+                connection.execute("INSERT INTO observations VALUES (?, ?, ?, ?, ?, ?)", (
+                    scan_id,
+                    result.get("scanned_at") or now,
+                    result["repository"],
+                    status,
+                    "repository-scan",
+                    json.dumps(dict(result, id=scan_id), sort_keys=True),
+                ))
+
+    def fail_scan_job(self, scan_id: str, code: str, message: str) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE scan_jobs SET status = 'failed', progress = 100, updated_at = ?, "
+                "error_code = ?, error_message = ? WHERE id = ? AND status IN ('queued','running')",
+                (now, code, message[:500], scan_id),
+            )
+
+    def cancel_scan_job(self, scan_id: str, cancel_token_hash: str) -> dict | None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM scan_jobs WHERE id = ?", (scan_id,)).fetchone()
+            if row is None:
+                return None
+            job = self._scan_job(row, include_private=True)
+            if not hmac.compare_digest(job["cancel_token_hash"], cancel_token_hash):
+                raise PermissionError("Invalid cancellation token")
+            if job["status"] == "running":
+                raise RuntimeError("Running scans cannot currently be interrupted safely")
+            if job["status"] == "queued":
+                connection.execute(
+                    "UPDATE scan_jobs SET status = 'cancelled', progress = 100, updated_at = ? WHERE id = ?",
+                    (now, scan_id),
+                )
+                row = connection.execute("SELECT * FROM scan_jobs WHERE id = ?", (scan_id,)).fetchone()
+        return self._scan_job(row)
+
+    def recover_interrupted_scan_jobs(self) -> int:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE scan_jobs SET status = 'incomplete', progress = 100, updated_at = ?, "
+                "error_code = 'worker_restarted', error_message = 'The scanner restarted before this job finished' "
+                "WHERE status IN ('queued','running')", (now,),
+            )
+        return cursor.rowcount
+
+    def public_artifact(self, sha256: str) -> dict | None:
+        indicators = json.loads((advisory_directory() / "indicators.json").read_text(encoding="utf-8"))
+        indicator = next((
+            item for item in indicators.get("indicators", [])
+            if item.get("status") == "confirmed" and item.get("sha256", "").lower() == sha256.lower()
+        ), None)
+        if indicator is None:
+            return None
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT id, result FROM scan_jobs WHERE kind = 'repository' AND status = 'completed' AND result IS NOT NULL"
+            ).fetchall()
+        history = []
+        for scan_id, payload in rows:
+            result = json.loads(payload)
+            paths = [
+                finding.get("path") for finding in result.get("findings", [])
+                if finding.get("sha256", "").lower() == sha256.lower()
+            ]
+            if paths:
+                history.append({"scan_id": scan_id, "repository": result.get("repository"), "paths": paths})
+        return {"sha256": sha256.lower(), "indicator": indicator, "analysis_history": history}
+
+    def repository_history(self, target: str) -> dict:
+        keys = self._repository_keys(target)
+        if not keys or len(target) > 500:
+            raise ValueError("Repository target is required")
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT id, result FROM scan_jobs WHERE kind = 'repository' AND status = 'completed' "
+                "AND result IS NOT NULL ORDER BY rowid DESC"
+            ).fetchall()
+        scans = []
+        all_results = []
+        for scan_id, payload in rows:
+            result = json.loads(payload)
+            item = {"scan_id": scan_id, **result}
+            all_results.append(item)
+            if keys & self._repository_keys(result.get("repository_url") or result.get("repository") or ""):
+                scans.append(item)
+        commits = {item.get("commit") for item in scans if item.get("commit")}
+        scan_ids = {item["scan_id"] for item in scans}
+        related = []
+        seen = set()
+        for item in all_results:
+            repository = item.get("repository_url") or item.get("repository")
+            if item.get("commit") in commits and item["scan_id"] not in scan_ids:
+                relation_key = (repository, item.get("commit"))
+                if relation_key not in seen:
+                    seen.add(relation_key)
+                    related.append({
+                        "repository": repository,
+                        "commit": item.get("commit"),
+                        "scan_id": item["scan_id"],
+                        "relationship": "shared_commit",
+                    })
+        ordered = sorted(scans, key=lambda item: (item.get("scanned_at", ""), item["scan_id"]))
+        transitions = []
+        for previous, current in zip(ordered, ordered[1:]):
+            comparison = self._compare_results(previous, current)
+            if previous.get("status") != current.get("status") or comparison["new_findings"] or comparison["removed_findings"]:
+                transitions.append({
+                    "base_scan_id": previous["scan_id"],
+                    "head_scan_id": current["scan_id"],
+                    "base_commit": previous.get("commit"),
+                    "head_commit": current.get("commit"),
+                    "branch": current.get("branch"),
+                    "from_status": previous.get("status"),
+                    "to_status": current.get("status"),
+                    **comparison,
+                })
+        return {
+            "repository": target,
+            "scans": ordered,
+            "transitions": transitions,
+            "related_repositories": related,
+            "relationship_note": "A shared commit is evidence of shared history, not proof of current ownership or fork ancestry.",
+        }
+
+    @staticmethod
+    def _repository_keys(target: str) -> set[str]:
+        from urllib.parse import urlparse
+        value = str(target).strip().lower().removesuffix(".git").rstrip("/")
+        if not value:
+            return set()
+        keys = {value}
+        parsed = urlparse(value)
+        if parsed.hostname and parsed.path.strip("/"):
+            keys.add(parsed.path.strip("/"))
+        return keys
+
+    def latest_repository_scan(self, target: str, branch: str | None = None) -> dict | None:
+        keys = self._repository_keys(target)
+        if not keys:
+            raise ValueError("Repository target is required")
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM scan_jobs WHERE kind = 'repository' ORDER BY rowid DESC"
+            ).fetchall()
+        for row in rows:
+            job = self._scan_job(row)
+            result = job.get("result") or {}
+            result_target = result.get("repository_url") or result.get("repository") or job["target"]
+            result_branch = result.get("branch") or job.get("requested_ref")
+            if keys & self._repository_keys(result_target) and (not branch or branch == result_branch):
+                return job
+        return None
+
+    @staticmethod
+    def _finding_key(finding: dict) -> tuple:
+        return (
+            finding.get("kind"), finding.get("path"), finding.get("line"),
+            finding.get("sha256"), finding.get("title"),
+        )
+
+    @classmethod
+    def _compare_results(cls, base: dict, head: dict) -> dict:
+        base_findings = {cls._finding_key(item): item for item in base.get("findings", [])}
+        head_findings = {cls._finding_key(item): item for item in head.get("findings", [])}
+        new_keys = head_findings.keys() - base_findings.keys()
+        removed_keys = base_findings.keys() - head_findings.keys()
+        if new_keys:
+            assessment = "new_findings_detected"
+        elif removed_keys:
+            assessment = "findings_removed"
+        else:
+            assessment = "no_finding_change"
+        return {
+            "assessment": assessment,
+            "new_findings": [head_findings[key] for key in sorted(new_keys, key=str)],
+            "removed_findings": [base_findings[key] for key in sorted(removed_keys, key=str)],
+            "interpretation": "This comparison identifies differences between two bounded scans; it does not prove author intent or that unscanned commits were safe.",
+        }
+
+    def compare_repository_scans(self, base_scan_id: str, head_scan_id: str) -> dict:
+        base_job = self.scan_job(base_scan_id)
+        head_job = self.scan_job(head_scan_id)
+        if base_job is None or head_job is None:
+            raise LookupError("One or both scans were not found")
+        for job in (base_job, head_job):
+            if job["kind"] != "repository" or job["status"] != "completed" or not job.get("result"):
+                raise ValueError("Comparisons require two completed repository scans")
+        base = {"scan_id": base_scan_id, **base_job["result"]}
+        head = {"scan_id": head_scan_id, **head_job["result"]}
+        return {
+            "base": {key: base.get(key) for key in ("scan_id", "repository", "repository_url", "branch", "commit", "status", "scanned_at")},
+            "head": {key: head.get(key) for key in ("scan_id", "repository", "repository_url", "branch", "commit", "status", "scanned_at")},
+            **self._compare_results(base, head),
+        }
 
     def recent_repository_scans(self, limit: int = 20) -> list[dict]:
         if not 1 <= limit <= 100:
