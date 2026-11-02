@@ -27,7 +27,16 @@ class PublicWebTests(unittest.TestCase):
                         self.assertEqual(json.load(response)['status'], 'FAIL')
                     self.assertEqual(get('/api/history'), {'observations':[]})
                     reviewed = get('/api/reviewed')
-                    self.assertEqual(len(reviewed['records']), 3)
+                    self.assertEqual(
+                        {
+                            'gpt-5-6/gpt-5-6.github.io',
+                            'gpt-6-astra/gpt-6-astra.github.io',
+                            'opus-5-0/opus-5-0.github.io',
+                            'lehhlass/Fluxus-Roblox-Executor',
+                            'hanneshow/Fluxus-Roblox-Executor',
+                        },
+                        {item['repository'] for item in reviewed['records']},
+                    )
                     self.assertNotIn('repositories', reviewed)
                     record = get('/api/record?repository=gpt-5-6%2Fgpt-5-6.github.io')
                     self.assertEqual(record['artifact'], 'sol-setup.zip')

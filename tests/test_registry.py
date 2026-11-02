@@ -45,6 +45,29 @@ class RegistryTests(unittest.TestCase):
             problems = validate_registry(directory)
         self.assertTrue(any(problem.message == "invalid SHA-256" for problem in problems))
 
+    def test_santastealer_hash_is_bound_to_both_fluxus_records(self):
+        from ward.data import advisory_directory
+
+        directory = advisory_directory()
+        indicators = json.loads((directory / "indicators.json").read_text(encoding="utf-8"))
+        records = json.loads((directory / "malware-records.json").read_text(encoding="utf-8"))
+        digest = "9df11356c5ac61d2aa7b5425e6322fc016b0ed5790dacb201396500b3eee03f7"
+
+        indicator = next(item for item in indicators["indicators"] if item["sha256"] == digest)
+        self.assertEqual(indicator["status"], "confirmed")
+        self.assertEqual(indicator["source_url"], "https://threatfox.abuse.ch/ioc/1957496/")
+        self.assertEqual(
+            {
+                "lehhlass/Fluxus-Roblox-Executor",
+                "hanneshow/Fluxus-Roblox-Executor",
+            },
+            {
+                item["repository"]
+                for item in records["records"]
+                if item["malware"] == "SantaStealer"
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
