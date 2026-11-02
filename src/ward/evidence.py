@@ -34,6 +34,23 @@ def malware_record(target: str) -> dict | None:
 def repository_warning(target: str) -> Assessment | None:
     owner, name = parse_repository_target(target)
     key = f"{owner}/{name}".lower()
+    record = malware_record(key)
+    if record is not None:
+        return Assessment(
+            target=f"{owner}/{name}", verdict="reviewed-malicious-repository", score=100,
+            exact_indicator_match=False, canonical_project=None,
+            signals=[Signal(
+                "reviewed_malware_record",
+                100,
+                f"Ward has a repository-specific {record['malware']} record for this exact repository.",
+            )],
+            limitations=[
+                record["scope"],
+                f"Evidence: {record['source_url']}",
+                f"The record is scoped to {record['release']} and must not be generalized to unrelated revisions or contributors.",
+                "Ward cloned and inspected the current public revision without executing repository code or external payloads.",
+            ],
+        )
     for item in reviewed_repositories():
         if item["repository"].lower() == key and item["status"] == "FAIL":
             return Assessment(

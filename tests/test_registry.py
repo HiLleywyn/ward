@@ -185,6 +185,21 @@ class RegistryTests(unittest.TestCase):
         )
         self.assertEqual(digests, set(campaign["confirmed_sha256"]))
 
+    def test_repository_warning_uses_repository_specific_malware_records(self):
+        from ward.evidence import repository_warning
+
+        warning = repository_warning("CarrierForge/Fishing-Planet-Cheat")
+
+        self.assertIsNotNone(warning)
+        self.assertEqual(warning.verdict, "reviewed-malicious-repository")
+        self.assertEqual(
+            "reviewed_malware_record",
+            warning.signals[0].key,
+        )
+        self.assertTrue(
+            any("a48fd3fc0f587bc272b1ad5dc0ea72675fed5ff9" in item for item in warning.limitations)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
