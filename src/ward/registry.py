@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from .data import load_malware_records
+
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -46,8 +48,16 @@ def validate_registry(directory: Path) -> list[RegistryProblem]:
     projects = _load(directory / "project-locations.json", problems)
     campaigns = _load(directory / "campaigns.json", problems)
     records = _load(directory / "malware-records.json", problems)
+    record_sets_path = directory / "malware-record-sets.json"
+    if record_sets_path.exists():
+        _load(record_sets_path, problems)
     seen_record_repositories: set[str] = set()
-    for index, item in enumerate(records.get("records", [])):
+    try:
+        expanded_records = load_malware_records(directory)
+    except (OSError, TypeError, ValueError, KeyError) as exc:
+        problems.append(RegistryProblem("malware-record-sets.json", "$", str(exc)))
+        expanded_records = records.get("records", [])
+    for index, item in enumerate(expanded_records):
         location = f"$.records[{index}]"
         repository = str(item.get("repository", "")).lower()
         if repository in seen_record_repositories:

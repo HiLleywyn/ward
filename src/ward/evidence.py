@@ -10,7 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .analyze import Assessment, Signal, parse_repository_target
-from .data import advisory_directory
+from .data import advisory_directory, load_malware_records
 
 
 def reviewed_repositories() -> list[dict]:
@@ -20,9 +20,7 @@ def reviewed_repositories() -> list[dict]:
 
 
 def malware_records() -> list[dict]:
-    path = advisory_directory() / "malware-records.json"
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    return payload["records"]
+    return load_malware_records()
 
 
 def malware_record(target: str) -> dict | None:

@@ -250,7 +250,20 @@
         "Delta Force",
         "PAYDAY 3",
         "Honkai Star Rail",
-        "Rust External"
+        "Rust External",
+        "mobile-device unlockers",
+        "iFunBox",
+        "Total Commander",
+        "SoundPad",
+        "Discord utilities",
+        "RX 11",
+        "FabFilter Total",
+        "uTorrent",
+        "HitFilm",
+        "cryptocurrency seed-phrase generators",
+        "KeyShot Pro",
+        "Movavi products",
+        "HWID spoofers"
       ],
       "reported_behavior": [
         "split-string PowerShell endpoint construction in GitHub READMEs",
@@ -267,7 +280,32 @@
         "https://github.com/ShatterCourierDrag/Delta-Force-Cheat",
         "https://github.com/Truebrecycle/PAYDAY-3-Cheat",
         "https://github.com/ConstablePucker/Honkai-Star-Rail-Cheat",
-        "https://github.com/hypergooseoverpass/Rust-External-Cheat"
+        "https://github.com/hypergooseoverpass/Rust-External-Cheat",
+        "https://github.com/glossnodeengage/Android-Unlocker",
+        "https://github.com/SpringLadyDivide/IOS-Unlocker",
+        "https://github.com/armslocksmithamplify/PassFab-Unlocker",
+        "https://github.com/Rewindlespin/Aiseesoft-Unlocker",
+        "https://github.com/KindPurify64/FonePaw-Unlocker",
+        "https://github.com/Poltergeistzuplan/UltFone-Unlocker",
+        "https://github.com/innershapepergola/IFunBox",
+        "https://github.com/Moduledebear/Total-Commander",
+        "https://github.com/CrewCommissioner/SoundPad",
+        "https://github.com/Armskostrike/Discord-Server-Raider",
+        "https://github.com/mythicassemblyladle/RX-11-Audio-Editor",
+        "https://github.com/Sapphireclifoster/FabFilter-Total",
+        "https://github.com/TabooColonelFactory/Uttorent",
+        "https://github.com/NoviceDestroy/HitFilm",
+        "https://github.com/Breezenovacode/Better-Discord",
+        "https://github.com/ConvergeRobinDeem/SeedPhraseGenerator",
+        "https://github.com/MetropolisFrog65/KeyShot-Pro",
+        "https://github.com/QuartzBullShroud/Movavi-Photo-Editor",
+        "https://github.com/GuardSupporter/Dr.Fone-Unlock",
+        "https://github.com/MacroDeerForceps/Hwid-Spoofer",
+        "https://github.com/holefencercall/Fishing-Planet-Cheat",
+        "https://github.com/ScorpionSplit/Movavi-Video-Suite-Plus",
+        "https://github.com/Noonbenprovide/Marvel-Rivals-Cheat",
+        "https://github.com/Southorreproduce96/AION-2-Cheat",
+        "https://github.com/RepresentativeAbyss/Movavi-Screen-Recorder"
       ],
       "confirmed_sha256": [
         "366a763fcd6980a1954d05c0625306ff1db57d0902376961efbc0c4e2b0c0d80",
@@ -317,7 +355,7 @@
           "attribution": "Ward public evidence collection"
         }
       ],
-      "validation_notes": "All seven repositories were live on 2026-11-02 and carried the same split-string download-and-execute command. Ward followed the public stages statically inside Kali, verified their hashes and authenticated decoding layers, and did not execute the scripts or PE. The shared delivery chain establishes common infrastructure, not the identity of the account operators."
+      "validation_notes": "All 32 repository-specific records were live and pinned on 2026-11-02 and carried a split-string download-and-execute command for the same still-live Setup.ps1 stage. Ward followed the public stages statically inside Kali, verified their hashes and authenticated decoding layers, and did not execute the scripts or PE. The shared delivery chain establishes common infrastructure, not the identity of the account operators."
     },
     {
       "id": "2026-10-phantom-blade-libcurl-sideload",

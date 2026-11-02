@@ -132,12 +132,12 @@ class RegistryTests(unittest.TestCase):
         )
         self.assertEqual({archive_digest, loader_digest}, set(campaign["confirmed_sha256"]))
 
-    def test_gitsoftware_wave_is_bound_to_seven_live_repositories(self):
-        from ward.data import advisory_directory
+    def test_gitsoftware_wave_is_bound_to_thirty_two_live_repositories(self):
+        from ward.data import advisory_directory, load_malware_records
 
         directory = advisory_directory()
         indicators = json.loads((directory / "indicators.json").read_text(encoding="utf-8"))
-        records = json.loads((directory / "malware-records.json").read_text(encoding="utf-8"))
+        records = load_malware_records(directory)
         campaigns = json.loads((directory / "campaigns.json").read_text(encoding="utf-8"))
         digests = {
             "366a763fcd6980a1954d05c0625306ff1db57d0902376961efbc0c4e2b0c0d80",
@@ -153,6 +153,31 @@ class RegistryTests(unittest.TestCase):
             "Truebrecycle/PAYDAY-3-Cheat",
             "ConstablePucker/Honkai-Star-Rail-Cheat",
             "hypergooseoverpass/Rust-External-Cheat",
+            "glossnodeengage/Android-Unlocker",
+            "SpringLadyDivide/IOS-Unlocker",
+            "armslocksmithamplify/PassFab-Unlocker",
+            "Rewindlespin/Aiseesoft-Unlocker",
+            "KindPurify64/FonePaw-Unlocker",
+            "Poltergeistzuplan/UltFone-Unlocker",
+            "innershapepergola/IFunBox",
+            "Moduledebear/Total-Commander",
+            "CrewCommissioner/SoundPad",
+            "Armskostrike/Discord-Server-Raider",
+            "mythicassemblyladle/RX-11-Audio-Editor",
+            "Sapphireclifoster/FabFilter-Total",
+            "TabooColonelFactory/Uttorent",
+            "NoviceDestroy/HitFilm",
+            "Breezenovacode/Better-Discord",
+            "ConvergeRobinDeem/SeedPhraseGenerator",
+            "MetropolisFrog65/KeyShot-Pro",
+            "QuartzBullShroud/Movavi-Photo-Editor",
+            "GuardSupporter/Dr.Fone-Unlock",
+            "MacroDeerForceps/Hwid-Spoofer",
+            "holefencercall/Fishing-Planet-Cheat",
+            "ScorpionSplit/Movavi-Video-Suite-Plus",
+            "Noonbenprovide/Marvel-Rivals-Cheat",
+            "Southorreproduce96/AION-2-Cheat",
+            "RepresentativeAbyss/Movavi-Screen-Recorder",
         }
 
         self.assertEqual(
@@ -166,11 +191,11 @@ class RegistryTests(unittest.TestCase):
         )
         wave_records = [
             item
-            for item in records["records"]
+            for item in records
             if item["malware"] == "Obfuscated PowerShell screenshot-exfiltration loader"
         ]
         self.assertEqual(repositories, {item["repository"] for item in wave_records})
-        self.assertEqual(7, len(wave_records))
+        self.assertEqual(32, len(wave_records))
         self.assertTrue(all(item["status"] == "FAIL" for item in wave_records))
         self.assertTrue(all("/blob/" in item["source_url"] for item in wave_records))
 
