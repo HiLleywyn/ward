@@ -1,7 +1,6 @@
 # Ward
 
 [![Ward](https://ward.lley.cat/api/v1/badges/HiLleywyn/ward.svg?branch=main)](https://ward.lley.cat/repositories/HiLleywyn/ward)
-[![Ward git.lley mirror](https://ward.lley.cat/api/v1/badge.svg?repository=https%3A%2F%2Fgit.lley.cat%2Fr%2Fb60252cb-df6f-478f-8cb7-d18f4cdd316b.git&branch=main)](https://ward.lley.cat/repository?target=https%3A%2F%2Fgit.lley.cat%2Fr%2Fb60252cb-df6f-478f-8cb7-d18f4cdd316b.git)
 
 Public site: [ward.lley.cat](https://ward.lley.cat)
 
