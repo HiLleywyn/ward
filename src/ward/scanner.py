@@ -70,6 +70,17 @@ PATTERNS = (
         "Downloads or decodes content and immediately executes it.",
     ),
     (
+        "powershell-download-scriptblock-execute",
+        "high",
+        "Downloaded PowerShell executed through ScriptBlock",
+        re.compile(
+            r"\.DownloadString\s*\([^)]*\)[\s\S]{0,320}"
+            r"(?:\.\s*)?\(\s*\[scriptblock\]\s*::\s*Create\s*\(",
+            re.I,
+        ),
+        "Downloads PowerShell text and immediately invokes a ScriptBlock built from the response.",
+    ),
+    (
         "persistence-task",
         "medium",
         "Scheduled-task persistence",

@@ -31,6 +31,38 @@
       "source_url": "https://www.mediafire.com/file/qpwc8yslmh79x5j/Installer.rar/file",
       "campaign": "Password-5139237619 MediaFire loader wave",
       "validation_notes": "Ward independently hashed Installer/Installer.exe from the password-protected archive. Static PE and control-flow analysis found retained chacha20_xor, gpo_exclude, want_uac, and gpo_open symbols and confirmed appended-payload decryption, Windows Defender policy exclusions, LOCALAPPDATA staging, and elevated launch behavior. The file was not executed."
+    },
+    {
+      "sha256": "366a763fcd6980a1954d05c0625306ff1db57d0902376961efbc0c4e2b0c0d80",
+      "status": "confirmed",
+      "first_seen": "2026-11-02",
+      "source_url": "https://git-software.cc/ps/Setup.ps1",
+      "campaign": "git-software.cc PowerShell delivery wave",
+      "validation_notes": "Ward fetched and hashed the live public Setup.ps1 stage inside Kali. Bounded static decoding verified ten authenticated AES layers and recovered a fetch-and-execute command for the next encrypted PowerShell stage. The script was not executed."
+    },
+    {
+      "sha256": "7bb0fa4816b5c494d56ac4a3ebd12b6759a55644e58c1247b4e2409cd04253bf",
+      "status": "confirmed",
+      "first_seen": "2026-11-02",
+      "source_url": "https://git-software.cc/encrypted/update.ps1",
+      "campaign": "git-software.cc PowerShell delivery wave",
+      "validation_notes": "Ward fetched and hashed the live update.ps1 wrapper inside Kali and decoded it statically. The recovered script geofences CIS country codes, adds a Defender exclusion, captures and uploads a screenshot with system metadata, downloads an encrypted archive, and launches its extracted PE. The script was not executed."
+    },
+    {
+      "sha256": "17bea6010be2710299304fb845c88a605b7f8cfd680394e9f23722f5b9ffe353",
+      "status": "confirmed",
+      "first_seen": "2026-11-02",
+      "source_url": "https://fucksociety.cc/encrypted/1.zip",
+      "campaign": "git-software.cc PowerShell delivery wave",
+      "validation_notes": "Ward independently hashed the live password-protected archive inside Kali. Static inspection with the password embedded in the decoded loader found one Windows PE at 1/1.exe. The archive contents were not executed."
+    },
+    {
+      "sha256": "59e820b58af3abbbe7aa31c7be8cc0b65e62c326d82a4912d85de59903a30464",
+      "status": "confirmed",
+      "first_seen": "2026-11-02",
+      "source_url": "https://fucksociety.cc/encrypted/1.zip",
+      "campaign": "git-software.cc PowerShell delivery wave",
+      "validation_notes": "Ward independently hashed the 1/1.exe payload extracted only inside Kali from the live encrypted archive. The enclosing decoded loader explicitly starts this PE after screenshot exfiltration and Defender exclusion changes. The packed PE was statically inspected and not executed."
     }
   ],
   "notes": [

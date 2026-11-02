@@ -46,6 +46,13 @@ class PublicWebTests(unittest.TestCase):
                             'FencerEngage/courier-dota2',
                             'magentaechoenchant/glyph-dota2',
                             'trapghostwall/ancient-dota2',
+                            'CarrierForge/Fishing-Planet-Cheat',
+                            'elementowlhover/Marvel-Rivals-Cheat',
+                            'hideprovostplaza/AION-2-Cheat',
+                            'ShatterCourierDrag/Delta-Force-Cheat',
+                            'Truebrecycle/PAYDAY-3-Cheat',
+                            'ConstablePucker/Honkai-Star-Rail-Cheat',
+                            'hypergooseoverpass/Rust-External-Cheat',
                         },
                         {item['repository'] for item in reviewed['records']},
                     )

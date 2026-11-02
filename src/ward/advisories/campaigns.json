@@ -237,6 +237,87 @@
         }
       ],
       "validation_notes": "Ward found 119 current GitHub repositories carrying password 5139237619. Eight live repositories resolve to MediaFire folder xpuwhpaw2jpbi and the exact confirmed malicious archive. Another 106 point to a different folder whose artifact was deleted before collection; those repositories remain historical leads and are not promoted to FAIL by this record. Five search matches did not expose a MediaFire folder URL."
+    },
+    {
+      "id": "2026-10-git-software-powershell-wave",
+      "title": "git-software.cc obfuscated PowerShell delivery wave",
+      "status": "confirmed-with-repository-artifacts",
+      "first_public_report": "2026-11-02",
+      "impersonated_projects": [
+        "Fishing Planet",
+        "Marvel Rivals",
+        "AION 2",
+        "Delta Force",
+        "PAYDAY 3",
+        "Honkai Star Rail",
+        "Rust External"
+      ],
+      "reported_behavior": [
+        "split-string PowerShell endpoint construction in GitHub READMEs",
+        "in-memory execution of a remotely downloaded PowerShell stage",
+        "ten-layer authenticated AES PowerShell obfuscation",
+        "CIS country-code geofencing and Microsoft Defender exclusion changes",
+        "desktop screenshot and system-metadata upload",
+        "encrypted archive download, extraction, and packed PE execution"
+      ],
+      "confirmed_repository_urls": [
+        "https://github.com/CarrierForge/Fishing-Planet-Cheat",
+        "https://github.com/elementowlhover/Marvel-Rivals-Cheat",
+        "https://github.com/hideprovostplaza/AION-2-Cheat",
+        "https://github.com/ShatterCourierDrag/Delta-Force-Cheat",
+        "https://github.com/Truebrecycle/PAYDAY-3-Cheat",
+        "https://github.com/ConstablePucker/Honkai-Star-Rail-Cheat",
+        "https://github.com/hypergooseoverpass/Rust-External-Cheat"
+      ],
+      "confirmed_sha256": [
+        "366a763fcd6980a1954d05c0625306ff1db57d0902376961efbc0c4e2b0c0d80",
+        "7bb0fa4816b5c494d56ac4a3ebd12b6759a55644e58c1247b4e2409cd04253bf",
+        "17bea6010be2710299304fb845c88a605b7f8cfd680394e9f23722f5b9ffe353",
+        "59e820b58af3abbbe7aa31c7be8cc0b65e62c326d82a4912d85de59903a30464"
+      ],
+      "evidence": [
+        {
+          "url": "https://git-software.cc/ps/Setup.ps1",
+          "type": "live-distribution-artifact",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/CarrierForge/Fishing-Planet-Cheat/blob/a48fd3fc0f587bc272b1ad5dc0ea72675fed5ff9/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/elementowlhover/Marvel-Rivals-Cheat/blob/a39ee02efd73a4652b3c14d76231f2739a7ab2cc/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/hideprovostplaza/AION-2-Cheat/blob/e0fee69e0dd017aa84f216483b1b7179b155af81/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/ShatterCourierDrag/Delta-Force-Cheat/blob/ff74d12c65e5d1bfc9feaf112b87328ceaee92ac/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/Truebrecycle/PAYDAY-3-Cheat/blob/146249319f5c19df2c0e10fffc981d964a8b3104/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/ConstablePucker/Honkai-Star-Rail-Cheat/blob/3e47711b9ddc56ad5874d5a09471533d7bb2a72c/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/hypergooseoverpass/Rust-External-Cheat/blob/9341076cbc83399271c95a0d1eb7e2e31839960c/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        }
+      ],
+      "validation_notes": "All seven repositories were live on 2026-11-02 and carried the same split-string download-and-execute command. Ward followed the public stages statically inside Kali, verified their hashes and authenticated decoding layers, and did not execute the scripts or PE. The shared delivery chain establishes common infrastructure, not the identity of the account operators."
     }
   ]
 }

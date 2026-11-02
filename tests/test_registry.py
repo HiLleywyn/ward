@@ -132,6 +132,59 @@ class RegistryTests(unittest.TestCase):
         )
         self.assertEqual({archive_digest, loader_digest}, set(campaign["confirmed_sha256"]))
 
+    def test_gitsoftware_wave_is_bound_to_seven_live_repositories(self):
+        from ward.data import advisory_directory
+
+        directory = advisory_directory()
+        indicators = json.loads((directory / "indicators.json").read_text(encoding="utf-8"))
+        records = json.loads((directory / "malware-records.json").read_text(encoding="utf-8"))
+        campaigns = json.loads((directory / "campaigns.json").read_text(encoding="utf-8"))
+        digests = {
+            "366a763fcd6980a1954d05c0625306ff1db57d0902376961efbc0c4e2b0c0d80",
+            "7bb0fa4816b5c494d56ac4a3ebd12b6759a55644e58c1247b4e2409cd04253bf",
+            "17bea6010be2710299304fb845c88a605b7f8cfd680394e9f23722f5b9ffe353",
+            "59e820b58af3abbbe7aa31c7be8cc0b65e62c326d82a4912d85de59903a30464",
+        }
+        repositories = {
+            "CarrierForge/Fishing-Planet-Cheat",
+            "elementowlhover/Marvel-Rivals-Cheat",
+            "hideprovostplaza/AION-2-Cheat",
+            "ShatterCourierDrag/Delta-Force-Cheat",
+            "Truebrecycle/PAYDAY-3-Cheat",
+            "ConstablePucker/Honkai-Star-Rail-Cheat",
+            "hypergooseoverpass/Rust-External-Cheat",
+        }
+
+        self.assertEqual(
+            digests,
+            {
+                item["sha256"]
+                for item in indicators["indicators"]
+                if item.get("campaign") == "git-software.cc PowerShell delivery wave"
+                and item["status"] == "confirmed"
+            },
+        )
+        wave_records = [
+            item
+            for item in records["records"]
+            if item["malware"] == "Obfuscated PowerShell screenshot-exfiltration loader"
+        ]
+        self.assertEqual(repositories, {item["repository"] for item in wave_records})
+        self.assertEqual(7, len(wave_records))
+        self.assertTrue(all(item["status"] == "FAIL" for item in wave_records))
+        self.assertTrue(all("/blob/" in item["source_url"] for item in wave_records))
+
+        campaign = next(
+            item
+            for item in campaigns["campaigns"]
+            if item["id"] == "2026-10-git-software-powershell-wave"
+        )
+        self.assertEqual(
+            {f"https://github.com/{repository}" for repository in repositories},
+            set(campaign["confirmed_repository_urls"]),
+        )
+        self.assertEqual(digests, set(campaign["confirmed_sha256"]))
+
 
 if __name__ == "__main__":
     unittest.main()
