@@ -24,9 +24,9 @@
       <div class="scanner-heading">
         <div>
           <h2 id="scanner-title">Scanner</h2>
-          <p>Ward clones and inspects the files. Repository code is never executed.</p>
+          <p>Checks files, scripts, and nested archives. Extended analysis adds isolated antivirus scanning.</p>
         </div>
-        <span class="mode">static scan</span>
+        <span class="mode">content inspection</span>
       </div>
       <form id="repo-form">
         <label class="sr-only" for="repo-target">Public Git repository URL</label>
@@ -38,11 +38,11 @@
           <select id="analysis-mode" name="analysis">
             <option value="extended">Extended static</option>
             <option value="static">Quick static</option>
-            <option value="behavioral" disabled>Windows behavior</option>
+            <option value="behavioral" disabled>Windows behavior (PE files)</option>
           </select>
         </label>
       </form>
-      <div id="repo-loading" class="loading" hidden role="status">Cloning and inspecting files. Nothing will be run.</div>
+      <div id="repo-loading" class="loading" hidden role="status">Cloning and inspecting repository content...</div>
       <div id="repo-result" class="scan-result" hidden aria-live="polite"></div>
     </section>
 

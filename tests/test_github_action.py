@@ -17,6 +17,28 @@ SPEC.loader.exec_module(ward_action)
 
 
 class WardGitHubActionTests(unittest.TestCase):
+    def test_action_waits_for_antivirus_before_deciding_success(self):
+        pending = {"id": "scan-av", "status": "completed", "links": {"self": "/api/v1/scans/scan-av"},
+                   "analyses": [{"status": "running"}]}
+        complete = dict(pending, analyses=[{"status": "completed"}])
+        report = {"verdict": {"status": "malicious"}, "evidence": {},
+                  "assessment": {"coverage": "completed"}, "engines": [{"detections": [{}]}]}
+        with patch.dict(os.environ, {"WARD_REPOSITORY_URL": "https://github.com/owner/repo"}, clear=True):
+            with patch.object(ward_action, "request_json", side_effect=[pending, complete, report]) as request:
+                with patch.object(ward_action.time, "sleep"):
+                    self.assertEqual(ward_action.main(), 1)
+        self.assertEqual(request.call_count, 3)
+
+    def test_incomplete_antivirus_cannot_pass_as_an_inspected_repository(self):
+        responses = [
+            {"id": "scan-av", "status": "completed", "links": {"self": "/api/v1/scans/scan-av"}},
+            {"verdict": {"status": "unknown"}, "evidence": {"verification": {"level": "inspected"}},
+             "assessment": {"coverage": "partial"}, "engines": []},
+        ]
+        with patch.dict(os.environ, {"WARD_REPOSITORY_URL": "https://github.com/owner/repo"}, clear=True):
+            with patch.object(ward_action, "request_json", side_effect=responses):
+                self.assertEqual(ward_action.main(), 1)
+
     def test_manifest_binds_pull_requests_to_their_head_commit(self):
         manifest = ACTION_MANIFEST.read_text(encoding="utf-8")
         self.assertIn("github.event.pull_request.head.repo.clone_url", manifest)

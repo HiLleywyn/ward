@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from uuid import uuid4
 
 from .api import APIError, ScanCoordinator, normalize_sha256, openapi_document, public_scan, report_for_job
+from .analysis import analysis_assessment
 from .analyze import assess_repository, parse_repository_target
 from .github import GitHubClient, GitHubError
 from .data import advisory_directory
@@ -37,7 +38,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
     coordinator = ScanCoordinator(store, scan_slot)
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "Ward/0.6.7"
+        server_version = "Ward/0.8.0"
         sys_version = ""
 
         def setup(self):
@@ -389,6 +390,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 histories = {}
                 for scan in recent:
                     scan["analyses"] = store.analyses.list(scan["id"])
+                    scan["assessment"] = analysis_assessment(scan)
                     target = scan.get("repository_url") or scan["repository"]
                     if target not in histories:
                         histories[target] = store.repository_history(target)

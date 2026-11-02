@@ -66,6 +66,20 @@ class AnalysisQueueTests(unittest.TestCase):
                 self.store.analyses.finish(claimed["id"], token, result=result)
         self.assertEqual(self.store.analyses.list(self.job["id"])[0]["status"], "running")
 
+    def test_validated_antivirus_result_reaches_report_and_badge_without_rewriting_static_evidence(self):
+        from ward.views import badge_state
+        analysis_id = self.enqueue()
+        self.complete()
+        claimed = self.store.analyses.claim("remnux")
+        result = {"sha256": self.digest, "coverage": "completed", "engines": [
+            {"name": "clamav", "status": "completed", "detections": ["Test.Signature"]}]}
+        result["evidence_digest"] = result_digest(result)
+        self.store.analyses.finish(analysis_id, claimed["claim_token"], result=result)
+        job = self.store.scan_job(self.job["id"])
+        self.assertEqual(job["result"], self.result)
+        self.assertEqual(report_for_job(job)["verdict"]["status"], "malicious")
+        self.assertEqual(badge_state(self.store.latest_repository_scan("https://example.org/repo.git"))[1], "malware detected")
+
     def test_unbound_artifact_is_never_sent_to_analyzer(self):
         self.enqueue("another.exe")
         self.complete()

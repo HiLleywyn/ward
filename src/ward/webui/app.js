@@ -99,7 +99,7 @@ function scanDetails(scan, expanded = false) {
   const name = textElement('strong', 'repository-name', scan.repository);
   const date = textElement('time', '', formatDate(scan.scanned_at));
   date.dateTime = scan.scanned_at;
-  summary.append(name, statusBadge(scan.status), date, icon('chevron-down', 'chevron'));
+  summary.append(name, statusBadge(scan.assessment?.status || scan.status), date, icon('chevron-down', 'chevron'));
 
   const body = document.createElement('div');
   body.className = 'scan-body';
@@ -110,6 +110,7 @@ function scanDetails(scan, expanded = false) {
     [`${summaryData.files || 0}`, 'files'],
     [formatBytes(summaryData.hashed_bytes || 0), 'hashed'],
     [`${summaryData.archives || 0}`, 'archives'],
+    [`${summaryData.text_files || 0}`, 'text files checked'],
     [formatDuration(scan.duration_ms || 0), 'duration'],
   ];
   for (const [value, label] of values) {
@@ -123,6 +124,8 @@ function scanDetails(scan, expanded = false) {
   revision.append(commit);
   if (scan.branch) revision.append(textElement('code', 'branch', `branch ${scan.branch}`));
   body.append(metadata, revision);
+  if (scan.assessment?.pending) body.append(textElement('p', 'scan-analysis-state', `${scan.assessment.pending} follow-up analysis job(s) running`));
+  if (scan.assessment?.coverage === 'partial') body.append(textElement('p', 'scan-analysis-state', 'Follow-up analysis has incomplete coverage. View the engine evidence below.'));
   const recordLink = document.createElement('a');
   recordLink.href = `/scans/${encodeURIComponent(scan.id)}`;
   recordLink.textContent = 'Scan record';
@@ -145,6 +148,7 @@ function scanDetails(scan, expanded = false) {
           details.append(textElement('p', '', (detection.values || []).map(value => value.string).join(' · ')));
         }
         if (engine.capabilities?.length) details.append(textElement('p', '', engine.capabilities.map(value => value.name).join(' · ')));
+        if (engine.detections?.length) details.append(textElement('p', '', engine.detections.join(' · ')));
       }
       const raw = document.createElement('details');
       raw.append(textElement('summary', '', 'Full analysis evidence'), textElement('pre', '', JSON.stringify(result, null, 2)));
@@ -170,10 +174,11 @@ function scanDetails(scan, expanded = false) {
     body.append(history);
   }
 
-  if (scan.findings?.length) {
+  const findings = [...(scan.findings || []), ...(scan.assessment?.findings || [])];
+  if (findings.length) {
     const list = document.createElement('ul');
     list.className = 'findings';
-    for (const finding of scan.findings) list.append(findingElement(finding));
+    for (const finding of findings) list.append(findingElement(finding));
     body.append(list);
   } else {
     body.append(textElement('p', 'no-findings', 'No exact indicator or configured static rule matched. This does not prove the repository is safe.'));
@@ -420,7 +425,7 @@ repoForm.addEventListener('submit', async event => {
     if (job.status !== 'completed') {
       throw new Error(job.error_message || (Date.now() >= deadline ? 'The scan did not finish within 90 seconds.' : 'The scan did not complete.'));
     }
-    const result = {...job.result, analyses: job.analyses};
+    const result = {...job.result, analyses: job.analyses, assessment: job.assessment};
     repoResult.replaceChildren(scanDetails(result, true));
     repoResult.className = 'scan-result';
     repoResult.hidden = false;
@@ -452,7 +457,7 @@ async function refreshAnalysis(url, deadline) {
     const job = await response.json();
     const displayed = repoResult.querySelector('a[href^="/scans/"]');
     if (displayed?.getAttribute('href') === `/scans/${job.id}`) {
-      repoResult.replaceChildren(scanDetails({...job.result, analyses: job.analyses}, true));
+      repoResult.replaceChildren(scanDetails({...job.result, analyses: job.analyses, assessment: job.assessment}, true));
     }
     await loadRecentScans();
     if (job.analyses?.some(item => ['queued', 'running'].includes(item.status))) refreshAnalysis(url, deadline);

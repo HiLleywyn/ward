@@ -3,6 +3,8 @@ from __future__ import annotations
 import html
 import json
 
+from .analysis import analysis_assessment
+
 
 def badge_state(job: dict | None) -> tuple[str, str, str]:
     if job is None:
@@ -11,11 +13,16 @@ def badge_state(job: dict | None) -> tuple[str, str, str]:
         return "…", "scanning", "#d8b45c"
     if job["status"] != "completed" or not job.get("result"):
         return "~", "incomplete", "#77736b"
-    verdict = job["result"].get("status")
+    verdict = analysis_assessment(job)["status"]
     if verdict == "Malicious":
         return "✕", "malware detected", "#c94f4f"
     if verdict in {"Corroborated", "Suspicious"}:
         return "!", "suspicious", "#c47b3a"
+    assessment = analysis_assessment(job)
+    if assessment["pending"]:
+        return "…", "analysis pending", "#d8b45c"
+    if assessment["coverage"] == "partial":
+        return "~", "partial analysis", "#77736b"
     if job["result"].get("findings"):
         return "!", "review findings", "#c47b3a"
     level = (job["result"].get("verification") or {}).get("level")
@@ -70,7 +77,7 @@ def scan_record_page(job: dict, report: dict | None) -> bytes:
     rows = "".join(
         f"<dt>{html.escape(name)}</dt><dd><code>{html.escape(str(value))}</code></dd>" for name, value in facts
     )
-    findings = result.get("findings", [])
+    findings = result.get("findings", []) + analysis_assessment(job)["findings"]
     if findings:
         finding_html = "".join(
             "<li><strong>{}</strong><code>{}</code><p>{}</p></li>".format(

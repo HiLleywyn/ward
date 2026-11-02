@@ -415,6 +415,7 @@ class ResultStore:
             result_target = result.get("repository_url") or result.get("repository") or job["target"]
             result_branch = result.get("branch") or job.get("requested_ref")
             if keys & self._repository_keys(result_target) and (not branch or branch == result_branch):
+                job["analyses"] = self.analyses.list(job["id"])
                 return job
         return None
 

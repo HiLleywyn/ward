@@ -4,7 +4,7 @@ Report a vulnerability in Ward through a private GitHub security advisory in
 this repository. Avoid public reports containing credentials or personal data.
 
 Ward clones public HTTPS Git repositories, hashes bounded content, parses
-supported text and archives, and may send at most two discovered executables to
+supported text and nested archives, and may send a repository snapshot plus up to two binaries to
 its isolated analysis workers. The public web container never executes
 submitted content and has no Docker management socket. REST file submission is
 transient and the browser interface has no upload control.

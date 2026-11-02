@@ -82,10 +82,13 @@ def main() -> int:
         headers={"Idempotency-Key": os.environ.get("WARD_IDEMPOTENCY_KEY", expected_commit)},
     )
     deadline = time.monotonic() + timeout
-    while job["status"] not in TERMINAL and time.monotonic() < deadline:
+    def unfinished(value):
+        return value["status"] not in TERMINAL or any(item.get("status") in {"queued", "running"} for item in value.get("analyses", []))
+
+    while unfinished(job) and time.monotonic() < deadline:
         time.sleep(2)
         job = request_json(f"{base_url}{job['links']['self']}")
-    if job["status"] not in TERMINAL:
+    if unfinished(job):
         raise RuntimeError(f"Ward did not finish within {timeout} seconds")
     scan_id = job["id"]
     record_url = f"{base_url}/scans/{scan_id}"
@@ -112,7 +115,8 @@ def main() -> int:
         ))
     )
     print(f"Ward {verdict}: {record_url}")
-    passed = verdict == "unknown" and verification in {"inspected", "verified"} and findings == 0
+    followup = report.get("assessment", {}).get("coverage", "not-requested")
+    passed = verdict == "unknown" and verification in {"inspected", "verified"} and findings == 0 and followup in {"completed", "not-requested"}
     return 0 if passed else 1
 
 

@@ -89,7 +89,7 @@ def scan_file(data: bytes, filename: str, digest: str) -> dict:
         inspected = inspect_tree(Path(temporary))
     exact_match = any(item.get("kind") == "known-malware-hash" for item in inspected["findings"])
     return {
-        "status": "Malicious" if exact_match else "Unverified",
+        "status": "Malicious" if exact_match else "Suspicious" if any(item.get("evidence_type") == "source-behavior" for item in inspected["findings"]) else "Unverified",
         "artifact": {"sha256": digest, "filename": safe_name, "size": len(data)},
         "summary": {key: inspected[key] for key in (
             "files", "bytes", "hashed_bytes", "text_files", "archives",
@@ -118,7 +118,9 @@ def scan_file(data: bytes, filename: str, digest: str) -> dict:
 
 
 def public_scan(job: dict) -> dict:
+    from .analysis import analysis_assessment
     value = dict(job)
+    value["assessment"] = analysis_assessment(job)
     scan_id = value["id"]
     value["links"] = {
         "self": f"/api/v1/scans/{scan_id}",
@@ -138,6 +140,7 @@ def finalize_result(scan_id: str, result: dict) -> dict:
 
 
 def report_for_job(job: dict) -> dict:
+    from .analysis import analysis_assessment
     if job["status"] not in TERMINAL_STATES:
         raise APIError(409, "scan_not_finished", "The scan has not reached a terminal state")
     result = job.get("result") or {}
@@ -147,7 +150,10 @@ def report_for_job(job: dict) -> dict:
         "Suspicious": ("suspicious", 0.65),
         "Unverified": ("unknown", 0.0),
     }
-    verdict, confidence = status_map.get(result.get("status"), ("incomplete", 0.0))
+    assessment = analysis_assessment(job)
+    verdict, confidence = status_map.get(assessment["status"], ("incomplete", 0.0))
+    if assessment["findings"]:
+        confidence = min(confidence, 0.95)
     if job["status"] != "completed":
         verdict, confidence = "incomplete", 0.0
     engine_status = "completed" if job["status"] == "completed" else job["status"]
@@ -157,6 +163,7 @@ def report_for_job(job: dict) -> dict:
         "created_at": job["created_at"],
         "completed_at": job["updated_at"] if job["status"] in TERMINAL_STATES else None,
         "verdict": {"status": verdict, "confidence": confidence},
+        "assessment": assessment,
         "engines": [{
             "name": "ward-static",
             "status": engine_status,
@@ -288,7 +295,9 @@ class ScanCoordinator:
                     samples = []
 
                     def capture(path, digest, source):
-                        if len(samples) < 2:
+                        if path == "@repository-snapshot.zip":
+                            samples.insert(0, (path, digest, source.read_bytes()))
+                        elif len(samples) < 2:
                             data = source.read_bytes()
                             samples.append((path, digest, data))
 
@@ -303,9 +312,10 @@ class ScanCoordinator:
                     if work["analysis"] != "static":
                         for path, digest, data in samples:
                             self.store.analyses.enqueue(scan_id, path, digest, data)
-                            if work["analysis"] == "behavioral":
+                            artifact = next(item for item in result["artifacts"] if item["path"] == path)
+                            if work["analysis"] == "behavioral" and artifact.get("format", "pe") == "pe":
                                 self.store.analyses.enqueue(scan_id, path, digest, data, "windows")
-                        result["analysis_policy"] = {"requested": work["analysis"], "max_artifacts": 2,
+                        result["analysis_policy"] = {"requested": work["analysis"], "max_artifacts": 3,
                                                      "selected": len(samples), "eligible": len(result.get("artifacts", []))}
                 elif kind == "file":
                     result = scan_file(work["data"], work["filename"], work["sha256"])

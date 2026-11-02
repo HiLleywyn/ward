@@ -10,7 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 
-REMNUX_IMAGE = "remnux/remnux-distro:noble"
+REMNUX_IMAGE = "ward-remnux:0.8.0"
 MAX_SAMPLE_BYTES = 32 * 1024 * 1024
 WORKER_TIMEOUT = 120
 

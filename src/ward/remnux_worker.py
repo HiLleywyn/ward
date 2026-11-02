@@ -50,6 +50,32 @@ def analyze(data):
     path.write_bytes(data)
     identified = run_tool("file", ["file", "--brief", str(path)], 10)
     engines.append(identified)
+    databases = list(Path("/var/lib/clamav").glob("*.c[lv]d"))
+    if not databases:
+        engines.append({"name": "clamav", "status": "unavailable", "detail": "No antivirus signature database is installed."})
+    else:
+        antivirus = run_tool("clamav", ["clamscan", "--no-summary", "--infected", "--stdout",
+            "--max-filesize=32M", "--max-scansize=64M", "--max-files=1000", "--max-recursion=6",
+            "--alert-exceeds-max=yes", "--alert-encrypted=yes", "--max-scantime=20000", str(path)], 30)
+        if antivirus.get("exit_code") == 1:
+            lines = antivirus.get("detail", "").splitlines()
+            antivirus["detections"] = [line.split(": ", 1)[-1].removesuffix(" FOUND") for line in lines if line.endswith(" FOUND")]
+            antivirus["status"] = "completed" if antivirus["detections"] else "failed"
+            antivirus.pop("exit_code", None)
+        else:
+            antivirus["detections"] = []
+        if any(value.startswith(("Heuristics.Limits.", "Heuristics.Encrypted.")) for value in antivirus["detections"]):
+            antivirus["status"] = "partial"
+        inventory = []
+        for item in databases:
+            with item.open("rb") as handle:
+                header = handle.read(512).decode("ascii", errors="replace").split(":")
+            inventory.append({"name": item.name, "size": item.stat().st_size,
+                "version": header[2] if len(header) > 2 else None,
+                "signatures": header[3] if len(header) > 3 else None,
+                "published": header[1] if len(header) > 1 else None})
+        antivirus["database_files"] = inventory
+        engines.append(antivirus)
     is_pe = data.startswith(b"MZ")
     packed = is_pe and b"MEI\x0c\x0b\x0a\x0b\x0e" in data
     if is_pe:
@@ -77,7 +103,7 @@ def analyze(data):
             engines.append({"name": "pefile", "status": "unavailable"})
         except Exception as exc:
             engines.append({"name": "pefile", "status": "failed", "detail": str(exc)[:500]})
-        identified_packer = run_tool("detect-it-easy", ["diec", "--json", str(path)], 30)
+        identified_packer = run_tool("detect-it-easy", ["diec", "--json", str(path)], 20)
         if identified_packer["status"] == "completed":
             try:
                 identified_packer["result"] = json.loads(identified_packer.pop("output"))
@@ -88,7 +114,7 @@ def analyze(data):
             capabilities = {"name": "capa", "status": "not-run", "scope": "packed-content-unresolved",
                             "limitation": "PyInstaller archive marker detected. Native launcher capabilities cannot establish bundled Python or encrypted payload behavior; unpacking is required."}
         else:
-            capabilities = run_tool("capa", ["capa", "--json", "--quiet", str(path)], 60)
+            capabilities = run_tool("capa", ["capa", "--json", "--quiet", str(path)], 45)
             capabilities["scope"] = "static-capabilities"
         if capabilities["status"] == "completed":
             try:

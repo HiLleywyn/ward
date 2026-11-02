@@ -18,9 +18,11 @@ from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
 
 from .analyze import load_indicators, parse_repository_target
+from .archives import archive_kind, inspect_archive
 from .data import advisory_directory
 from .evidence import repository_warning
 from .source_rules import python_findings
+from .script_rules import lua_findings
 
 
 MAX_FILES = 5_000
@@ -32,13 +34,6 @@ CLONE_TIMEOUT_SECONDS = 60
 REF_PATTERN = re.compile(r"^[A-Za-z0-9._/-]{1,200}$")
 COMMIT_PATTERN = re.compile(r"^[A-Fa-f0-9]{40,64}$")
 
-TEXT_SUFFIXES = {
-    ".bat", ".cmd", ".conf", ".cs", ".go", ".html", ".ini", ".java", ".js",
-    ".json", ".jsx", ".md", ".php", ".ps1", ".py", ".rb", ".rs", ".sh",
-    ".toml", ".ts", ".tsx", ".txt", ".xml", ".yaml", ".yml",
-}
-EXECUTABLE_SUFFIXES = {".apk", ".app", ".bat", ".cmd", ".com", ".dll", ".dylib", ".exe", ".jar", ".msi", ".ps1", ".scr", ".sh", ".so"}
-ARCHIVE_SUFFIXES = {".zip", ".jar"}
 PYINSTALLER_MAGIC = b"MEI\x0c\x0b\x0a\x0b\x0e"
 PYINSTALLER_COOKIE_FORMATS = ((88, "!8sIIII64s"), (24, "!8sIIII"))
 MAX_PYINSTALLER_TOC_BYTES = 1024 * 1024
@@ -190,15 +185,20 @@ def _github_target(url: str) -> str | None:
 
 
 def _decode_text(data: bytes) -> str | None:
-    if b"\0" in data[:4096]:
-        return None
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
         try:
             return data.decode("utf-16")
         except UnicodeDecodeError:
             return None
+    if b"\0" in data:
+        return None
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return None
+    if any(ord(char) < 32 and char not in "\t\n\r\f" for char in text[:4096]):
+        return None
+    return text
 
 
 def _pattern_findings(text: str, path: str) -> list[dict]:
@@ -219,47 +219,22 @@ def _pattern_findings(text: str, path: str) -> list[dict]:
     return findings
 
 
-def _archive_findings(path: Path, display_path: str) -> tuple[list[dict], int]:
-    findings: list[dict] = []
-    inspected = 0
-    try:
-        with zipfile.ZipFile(path) as archive:
-            members = archive.infolist()[:500]
-            total_uncompressed = sum(member.file_size for member in members)
-            total_compressed = sum(max(member.compress_size, 1) for member in members)
-            if total_uncompressed > 256 * 1024 * 1024 or total_uncompressed / max(total_compressed, 1) > 150:
-                findings.append({
-                    "kind": "archive-expansion",
-                    "severity": "medium",
-                    "title": "Archive expands unusually far",
-                    "path": display_path,
-                    "detail": "The archive was indexed but not expanded because its declared size or compression ratio is unusually high.",
-                })
-                return findings, 0
-            budget = 4 * 1024 * 1024
-            for member in members:
-                if member.is_dir() or member.file_size > 512 * 1024 or budget <= 0:
-                    continue
-                suffix = Path(member.filename).suffix.lower()
-                if suffix not in TEXT_SUFFIXES:
-                    continue
-                data = archive.read(member)
-                budget -= len(data)
-                text = _decode_text(data)
-                if text is not None:
-                    member_path = f"{display_path}!{member.filename}"
-                    findings.extend(_pattern_findings(text, member_path))
-                    findings.extend(python_findings(text, member_path))
-                    inspected += 1
-    except (OSError, zipfile.BadZipFile, RuntimeError):
-        findings.append({
-            "kind": "archive-unreadable",
-            "severity": "info",
-            "title": "Archive could not be inspected",
-            "path": display_path,
-            "detail": "Ward recorded the archive but could not safely inspect its entries.",
-        })
-    return findings, inspected
+def _content_findings(data: bytes, path: str, known_hashes: dict | None = None) -> tuple[list[dict], bool]:
+    findings = []
+    digest = hashlib.sha256(data).hexdigest()
+    if known_hashes and digest in known_hashes:
+        findings.append({"kind": "known-malware-hash", "severity": "critical", "title": "Exact known-malware hash",
+                         "path": path, "sha256": digest, "source_url": known_hashes[digest]["source_url"],
+                         "detail": "Archive member SHA-256 exactly matches a confirmed malicious-file indicator."})
+    if len(data) > MAX_TEXT_BYTES:
+        return findings, False
+    text = _decode_text(data)
+    if text is None:
+        return findings, False
+    findings.extend(_pattern_findings(text, path))
+    findings.extend(python_findings(text, path))
+    findings.extend(lua_findings(text, path))
+    return findings, True
 
 
 def _pyinstaller_entries(data: bytes) -> list[dict] | None:
@@ -415,7 +390,14 @@ def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=No
     truncated = False
     coverage_incomplete = False
     for path in sorted(root.rglob("*")):
-        if ".git" in path.parts or path.is_symlink() or not path.is_file():
+        if ".git" in path.parts:
+            continue
+        if path.is_symlink():
+            coverage_incomplete = True
+            findings.append({"kind": "symlink-skipped", "severity": "info", "title": "Symbolic link was not followed",
+                "path": path.relative_to(root).as_posix(), "detail": "Ward did not follow this link outside the scanned file inventory; target coverage is incomplete."})
+            continue
+        if not path.is_file():
             continue
         file_count += 1
         if file_count > MAX_FILES:
@@ -424,6 +406,7 @@ def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=No
         try:
             size = path.stat().st_size
         except OSError:
+            coverage_incomplete = True
             continue
         total_bytes += size
         if total_bytes > MAX_REPOSITORY_BYTES:
@@ -431,19 +414,22 @@ def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=No
             break
         relative = path.relative_to(root).as_posix()
         suffix = path.suffix.lower()
-        if suffix in EXECUTABLE_SUFFIXES:
-            executable_files += 1
+        prefix = b""
         read_error = False
         if size <= MAX_FILE_BYTES and hashed_bytes + size <= MAX_HASH_BYTES:
             digest = hashlib.sha256()
             try:
                 with path.open("rb") as handle:
+                    prefix = handle.read(4096)
+                    digest.update(prefix)
                     for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                         digest.update(chunk)
                 sha256 = digest.hexdigest()
                 hashed_bytes += size
-                if suffix in {".exe", ".dll", ".scr"}:
-                    artifacts.append({"path": relative, "sha256": sha256, "size": size})
+                binary_kind = "pe" if prefix.startswith(b"MZ") else "elf" if prefix.startswith(b"\x7fELF") else "macho" if prefix[:4] in {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe"} else None
+                if binary_kind:
+                    executable_files += 1
+                    artifacts.append({"path": relative, "sha256": sha256, "size": size, "format": binary_kind})
                     if artifact_sink is not None:
                         artifact_sink(relative, sha256, path)
                 if sha256 in known_hashes:
@@ -476,29 +462,38 @@ def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=No
                 "path": relative,
                 "detail": "Ward recorded the file but did not hash its bytes because a per-file or scan-wide hashing limit was reached.",
             })
-        if suffix in ARCHIVE_SUFFIXES:
-            archive_findings, archive_text = _archive_findings(path, relative)
-            findings.extend(archive_findings)
-            text_files += archive_text
-            archives += 1
-        if suffix == ".exe" and size <= MAX_FILE_BYTES and not read_error:
+        if archive_kind(prefix, relative) and size <= MAX_FILE_BYTES and not read_error:
+            try:
+                archive_findings, archive_text, archive_count = inspect_archive(
+                    path.read_bytes(), relative, lambda data, location: _content_findings(data, location, known_hashes))
+                findings.extend(archive_findings)
+                text_files += archive_text
+                archives += archive_count
+            except OSError:
+                coverage_incomplete = True
+        if prefix.startswith(b"MZ") and size <= MAX_FILE_BYTES and not read_error:
             packed_findings, packed_incomplete, packed_archive = _pyinstaller_findings(path, relative)
             findings.extend(packed_findings)
             if packed_archive:
                 archives += 1
             if packed_incomplete:
                 coverage_incomplete = True
-        if size <= MAX_TEXT_BYTES and suffix in TEXT_SUFFIXES:
+        if size <= MAX_TEXT_BYTES and not read_error:
             try:
                 text = _decode_text(path.read_bytes())
             except OSError:
                 text = None
             if text is not None:
                 text_files += 1
+                if text.startswith("version https://git-lfs.github.com/spec/v1") or path.name == ".gitmodules":
+                    coverage_incomplete = True
+                    findings.append({"kind": "external-content-not-fetched", "severity": "info",
+                        "title": "Referenced repository content was not fetched", "path": relative,
+                        "detail": "This LFS pointer or submodule definition references content outside the cloned file inventory. That content was not inspected."})
                 findings.extend(_pattern_findings(text, relative))
-                source_findings = python_findings(text, relative)
+                source_findings = python_findings(text, relative) + lua_findings(text, relative)
                 findings.extend(source_findings)
-                if any(item['kind'] in {'python-source-limit', 'python-source-unparsed'} for item in source_findings):
+                if any(item['kind'] in {'python-source-limit', 'python-source-unparsed', 'lua-source-limit'} for item in source_findings):
                     coverage_incomplete = True
                 if path.name == "package.json":
                     try:
@@ -514,10 +509,15 @@ def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=No
                             "path": relative,
                             "detail": "Runs during package installation: " + ", ".join(sorted(hooks)),
                         })
+        elif size > MAX_TEXT_BYTES and _decode_text(prefix) is not None and prefix:
+            coverage_incomplete = True
+            findings.append({"kind": "text-inspection-limit", "severity": "info", "title": "Text file exceeded the source inspection limit",
+                "path": relative, "detail": "The file was hashed when possible, but its full source was outside the bounded text-analysis budget."})
     rank = {"critical": 0, "high": 1, "medium": 2, "info": 3}
     findings.sort(key=lambda item: (rank.get(item["severity"], 9), item.get("path", ""), item["title"]))
     archive_incomplete = any(
-        item.get("kind") in {"archive-expansion", "archive-unreadable", "python-source-limit", "python-source-unparsed"}
+        item.get("kind") in {"archive-expansion", "archive-unreadable", "archive-encrypted", "archive-unsupported",
+                             "archive-unsafe-entry", "archive-inspection-limit", "python-source-limit", "python-source-unparsed", "lua-source-limit"}
         for item in findings
     )
     return {
@@ -528,13 +528,14 @@ def inspect_tree(root: Path, *, indicators: dict | None = None, artifact_sink=No
         "archives": archives,
         "executable_files": executable_files,
         "truncated": truncated,
-        "partial": truncated or archive_incomplete or coverage_incomplete,
+        "partial": truncated or archive_incomplete or coverage_incomplete or len(findings) > 100,
         "findings": findings[:100],
         "artifacts": artifacts,
     }
 
 
 def scan_repository(value: str, ref: str | None = None, expected_commit: str | None = None, *, artifact_sink=None) -> dict:
+    from . import __version__
     started = time.monotonic()
     ref = normalize_git_ref(ref)
     if expected_commit is not None and not COMMIT_PATTERN.fullmatch(expected_commit):
@@ -601,6 +602,32 @@ def scan_repository(value: str, ref: str | None = None, expected_commit: str | N
         except (subprocess.SubprocessError, OSError) as exc:
             raise ScanError("Repository branch could not be recorded") from exc
         inspected = inspect_tree(checkout, artifact_sink=artifact_sink)
+        if artifact_sink is not None:
+            snapshot = temporary_path / "repository-snapshot.zip"
+            selected = omitted = snapshot_bytes = 0
+            with zipfile.ZipFile(snapshot, "w", compression=zipfile.ZIP_STORED) as archive:
+                for source in sorted(checkout.rglob("*")):
+                    if ".git" in source.relative_to(checkout).parts or source.is_symlink() or not source.is_file():
+                        continue
+                    relative_path = source.relative_to(checkout).as_posix()
+                    entry_bytes = source.stat().st_size + 2 * len(relative_path.encode("utf-8")) + 256
+                    if selected >= MAX_FILES or snapshot_bytes + entry_bytes > 31 * 1024 * 1024:
+                        omitted += 1
+                        continue
+                    info = zipfile.ZipInfo(relative_path)
+                    archive.writestr(info, source.read_bytes())
+                    snapshot_bytes += entry_bytes
+                    selected += 1
+            snapshot_data = snapshot.read_bytes()
+            snapshot_digest = hashlib.sha256(snapshot_data).hexdigest()
+            inspected["artifacts"].append({"path": "@repository-snapshot.zip", "sha256": snapshot_digest,
+                "size": len(snapshot_data), "format": "repository-snapshot", "members": selected, "omitted": omitted})
+            artifact_sink("@repository-snapshot.zip", snapshot_digest, snapshot)
+            if omitted:
+                inspected["partial"] = True
+                inspected["findings"].append({"kind": "repository-antivirus-limit", "severity": "info",
+                    "title": "Repository antivirus snapshot is incomplete", "path": "@repository-snapshot.zip",
+                    "detail": f"{omitted} files were outside the bounded antivirus snapshot; static file inspection remains separate."})
     warning = repository_warning(_github_target(url)) if _github_target(url) else None
     exact_matches = sum(1 for item in inspected["findings"] if item["kind"] == "known-malware-hash")
     if exact_matches:
@@ -623,6 +650,7 @@ def scan_repository(value: str, ref: str | None = None, expected_commit: str | N
     sources = list(dict.fromkeys(sources))
     return {
         "id": str(uuid4()),
+        "scanner_version": __version__,
         "repository": label,
         "repository_url": url,
         "commit": commit,

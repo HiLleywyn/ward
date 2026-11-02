@@ -1,0 +1,4 @@
+FROM remnux/remnux-distro:noble@sha256:880089abf02feb5240607545ab601e2d97d7b1c213d6341aa2e7ce356f65c8c2
+USER root
+RUN timeout 240 freshclam --foreground --stdout --no-dns --checks=1
+USER remnux

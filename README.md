@@ -88,11 +88,15 @@ record, then removes the checkout. Public scans are serialized and size-bounded.
 There is no hourly allowance; a bounded queue and worker concurrency provide
 admission control.
 
-The default Extended scan sends at most two discovered Windows executables to a
-separate trusted controller for offline REMnux static analysis. The public web
+The default Extended scan sends a repository snapshot and up to two discovered
+binaries to a trusted controller for offline ClamAV and REMnux analysis. The public web
 container has no Docker management socket. Windows behavior is selectable only
 while a host worker has passed a benign disposable-Sandbox smoke test and is
 sending a current heartbeat. Neither mode upgrades a result to `Verified`.
+
+[Content scanning and coverage](docs/CONTENT-SCANNING.md) describes extensionless
+source inspection, nested archives, source-behavior rules, antivirus signatures,
+and the limits recorded in each scan.
 
 The public interface no longer accepts file uploads. Local file hashing remains
 available through the CLI below, where the file stays on your machine.

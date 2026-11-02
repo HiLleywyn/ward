@@ -212,6 +212,7 @@
           "progress": {"type": "integer", "minimum": 0, "maximum": 100},
           "result": {"type": ["object", "null"]},
           "analyses": {"type": "array", "items": {"$ref": "#/components/schemas/ArtifactAnalysis"}},
+          "assessment": {"type": "object", "description": "Current combined static and validated follow-up verdict; the immutable static result and digest remain in result.", "properties": {"status": {"type": "string"}, "pending": {"type": "integer"}, "coverage": {"type": "string"}, "findings": {"type": "array", "items": {"type": "object"}}}},
           "error_code": {"type": ["string", "null"]},
           "error_message": {"type": ["string", "null"]},
           "links": {"type": "object", "additionalProperties": {"type": "string"}}

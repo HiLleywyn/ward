@@ -22,6 +22,36 @@ def result_digest(value):
     ).encode()).hexdigest()
 
 
+def analysis_assessment(job):
+    """Project validated follow-up detections without rewriting the static evidence."""
+    result = job.get("result") or job
+    status = result.get("status", "Unverified")
+    findings = []
+    for analysis in job.get("analyses", []):
+        if analysis.get("status") != "completed":
+            continue
+        for engine in (analysis.get("result") or {}).get("engines", []):
+            if engine.get("name") != "clamav" or engine.get("status") not in {"completed", "partial"}:
+                continue
+            for detection in engine.get("detections", []):
+                if detection.startswith("Heuristics.Limits."):
+                    continue
+                caution = detection.startswith(("PUA.", "Heuristics.Encrypted.")) or "Eicar" in detection
+                findings.append({"kind": "antivirus-detection", "severity": "high" if caution else "critical",
+                    "title": "ClamAV detection: " + detection, "path": analysis["path"], "sha256": analysis["sha256"],
+                    "evidence_type": "antivirus-signature", "analysis_id": analysis["id"],
+                    "detail": "The isolated ClamAV engine matched this signature. The analysis record binds the signature database and artifact digest; static evidence remains unchanged."})
+                if not caution:
+                    status = "Malicious"
+                elif status == "Unverified":
+                    status = "Suspicious"
+    analyses = job.get("analyses", [])
+    pending = sum(item.get("status") in {"queued", "running"} for item in analyses)
+    partial = any(item.get("status") == "incomplete" or (item.get("result") or {}).get("coverage") == "partial" for item in analyses)
+    return {"status": status, "findings": findings, "pending": pending,
+            "coverage": "pending" if pending else "partial" if partial else "completed" if analyses else "not-requested"}
+
+
 class AnalysisQueue:
     def __init__(self, store):
         self.store = store
