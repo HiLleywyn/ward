@@ -25,7 +25,6 @@ def sandbox_config(input_path: Path, output_path: Path) -> str:
 <ProtectedClient>Enable</ProtectedClient><MemoryInMB>4096</MemoryInMB>
 <MappedFolders><MappedFolder><HostFolder>{escape(str(input_path))}</HostFolder><SandboxFolder>C:\WardInput</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
 <MappedFolder><HostFolder>{escape(str(output_path))}</HostFolder><SandboxFolder>C:\WardOutput</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder></MappedFolders>
-<LogonCommand><Command>powershell.exe -NoProfile -File C:\WardInput\collect.ps1</Command></LogonCommand>
 </Configuration>"""
 
 
@@ -58,6 +57,14 @@ def _sandbox_id(value):
     return None
 
 
+def _guest_command(executable: str, sandbox_id: str) -> list[str]:
+    return [
+        executable, "exec", "--id", sandbox_id,
+        "--command", r"powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\WardInput\collect.ps1",
+        "--run-as", "System", "--raw",
+    ]
+
+
 def analyze_windows(data: bytes, *, expected_sha256: str) -> dict:
     executable = shutil.which("wsb.exe") if os.name == "nt" else None
     if executable is None:
@@ -81,11 +88,19 @@ def analyze_windows(data: bytes, *, expected_sha256: str) -> dict:
         sandbox_id = _sandbox_id(json.loads(started.stdout))
         if not sandbox_id:
             raise ValueError("Windows Sandbox did not return a valid instance ID")
+        execution = None
         try:
-            subprocess.run([executable, "connect", "--id", sandbox_id], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30, check=True)
+            execution = subprocess.Popen(
+                _guest_command(executable, sandbox_id),
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
             deadline = time.monotonic() + 180
             report_path = outputs / "result.json"
             while time.monotonic() < deadline:
+                if execution.poll() not in (None, 0):
+                    stdout, stderr = execution.communicate(timeout=1)
+                    detail = (stderr or stdout or "unknown error").strip()[:300]
+                    raise ValueError(f"Windows guest collector failed: {detail}")
                 if _directory_bytes(outputs, 16 * 1024 * 1024) > 16 * 1024 * 1024:
                     raise ValueError("Windows guest exceeded its 16 MiB result-directory limit")
                 if report_path.is_file() and report_path.stat().st_size <= 2 * 1024 * 1024:
@@ -101,6 +116,13 @@ def analyze_windows(data: bytes, *, expected_sha256: str) -> dict:
             else:
                 raise ValueError("Windows guest analysis exceeded its 180 second limit")
         finally:
+            if execution is not None and execution.poll() is None:
+                execution.terminate()
+                try:
+                    execution.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    execution.kill()
+                    execution.wait(timeout=5)
             subprocess.run([executable, "stop", "--id", sandbox_id], capture_output=True, timeout=30, check=True)
         report = {
             "schema": "ward-windows-behavior-v1", "sha256": expected_sha256,

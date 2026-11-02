@@ -1,7 +1,7 @@
 services:
   ward:
     build: .
-    image: ward:0.6.0
+    image: ward:0.6.1
     container_name: ward
     restart: unless-stopped
     environment:
@@ -25,7 +25,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    image: ward-worker:0.6.0
+    image: ward-worker:0.6.1
     container_name: ward-analysis
     restart: unless-stopped
     network_mode: none

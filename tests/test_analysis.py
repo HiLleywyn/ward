@@ -8,7 +8,7 @@ from pathlib import Path
 from ward.analysis import result_digest
 from ward.api import report_for_job
 from ward.evidence import ResultStore
-from ward.windows import _sandbox_id, sandbox_config
+from ward.windows import _guest_command, _sandbox_id, sandbox_config
 
 
 class AnalysisQueueTests(unittest.TestCase):
@@ -113,6 +113,14 @@ class WindowsPolicyTests(unittest.TestCase):
         self.assertEqual(len(mappings), 2)
         self.assertEqual(mappings[0].findtext("ReadOnly"), "true")
         self.assertEqual(mappings[1].findtext("ReadOnly"), "false")
+        self.assertIsNone(root.find("LogonCommand"))
+
+    def test_guest_collector_is_explicitly_executed_as_system(self):
+        sandbox_id = "01234567-1234-1234-1234-0123456789ab"
+        command = _guest_command("wsb.exe", sandbox_id)
+        self.assertEqual(command[:4], ["wsb.exe", "exec", "--id", sandbox_id])
+        self.assertEqual(command[command.index("--run-as") + 1], "System")
+        self.assertIn(r"C:\WardInput\collect.ps1", command[command.index("--command") + 1])
 
     def test_only_explicit_sandbox_identifiers_are_used_for_teardown(self):
         expected = "01234567-1234-1234-1234-0123456789ab"
