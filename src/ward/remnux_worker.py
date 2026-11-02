@@ -16,6 +16,8 @@ import tempfile
 
 MAX_BYTES = 32 * 1024 * 1024
 MAX_OUTPUT = 8 * 1024 * 1024
+MAX_FLOSS_STRINGS = 500
+MAX_FLOSS_STRING_LENGTH = 1024
 
 
 def run_tool(name, command, timeout):
@@ -51,6 +53,30 @@ def run_tool(name, command, timeout):
     if run.returncode:
         result.update(status="failed", detail=f"Tool exited with code {run.returncode}")
     return result
+
+
+def summarize_floss(document):
+    """Keep bounded recovered strings instead of returning FLOSS's full report."""
+    strings = document.get("strings", {}) if isinstance(document, dict) else {}
+    categories = ("stack_strings", "tight_strings", "decoded_strings")
+    recovered, seen, counts = [], set(), {}
+    for category in categories:
+        values = strings.get(category, [])
+        if not isinstance(values, list):
+            values = []
+        counts[category] = len(values)
+        for item in values:
+            value = item.get("string") if isinstance(item, dict) else item
+            if not isinstance(value, str) or not value or value in seen:
+                continue
+            seen.add(value)
+            recovered.append({
+                "type": category.removesuffix("_strings"),
+                "value": value[:MAX_FLOSS_STRING_LENGTH],
+            })
+            if len(recovered) >= MAX_FLOSS_STRINGS:
+                return counts, recovered, True
+    return counts, recovered, False
 
 
 def analyze(data):
@@ -123,6 +149,25 @@ def analyze(data):
             capabilities = {"name": "capa", "status": "not-run", "scope": "packed-content-unresolved",
                             "limitation": "PyInstaller archive marker detected. Native launcher capabilities cannot establish bundled Python or encrypted payload behavior; unpacking is required."}
         else:
+            recovered_strings = run_tool(
+                "floss",
+                ["floss", "--json", "--quiet", "--only", "stack", "tight", "decoded", "--", str(path)],
+                60,
+            )
+            recovered_strings["scope"] = "deobfuscated-strings"
+            if recovered_strings["status"] == "completed":
+                try:
+                    document = json.loads(recovered_strings.pop("output"))
+                    counts, recovered, truncated = summarize_floss(document)
+                    recovered_strings["version"] = document.get("metadata", {}).get("version")
+                    recovered_strings["counts"] = counts
+                    recovered_strings["strings"] = recovered
+                    if truncated:
+                        recovered_strings["status"] = "partial"
+                        recovered_strings["detail"] = "Recovered-string inventory reached its item limit"
+                except (AttributeError, TypeError, ValueError) as exc:
+                    recovered_strings = {"name": "floss", "status": "failed", "detail": "Invalid tool JSON: " + str(exc)[:200]}
+            engines.append(recovered_strings)
             capabilities = run_tool("capa", ["capa", "--json", "--quiet", str(path)], 45)
             capabilities["scope"] = "static-capabilities"
         if capabilities["status"] == "completed":
@@ -141,7 +186,7 @@ def analyze(data):
                 capabilities = {"name": "capa", "status": "failed", "detail": "Invalid tool JSON: " + str(exc)[:200]}
         engines.append(capabilities)
     else:
-        engines.extend({"name": name, "status": "not-applicable"} for name in ("pefile", "capa"))
+        engines.extend({"name": name, "status": "not-applicable"} for name in ("pefile", "floss", "capa"))
     return {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data), "engines": engines,
             "coverage": "partial" if packed or any(engine["status"] not in {"completed", "not-applicable"} for engine in engines) else "completed",
             "behavioral_analysis": "not-run"}

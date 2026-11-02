@@ -88,6 +88,28 @@ class RemnuxTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Worker runs inside Linux REMnux")
 class RemnuxWorkerTests(unittest.TestCase):
+    def test_floss_summary_is_deduplicated_and_bounded(self):
+        from ward.remnux_worker import MAX_FLOSS_STRINGS, summarize_floss
+
+        document = {
+            "strings": {
+                "stack_strings": [{"string": "decoded.example"}, {"string": "decoded.example"}],
+                "tight_strings": [{"string": "powershell"}],
+                "decoded_strings": [
+                    {"string": f"value-{index}"} for index in range(MAX_FLOSS_STRINGS + 10)
+                ],
+            }
+        }
+
+        counts, recovered, truncated = summarize_floss(document)
+
+        self.assertEqual(counts["stack_strings"], 2)
+        self.assertEqual(counts["tight_strings"], 1)
+        self.assertEqual(counts["decoded_strings"], MAX_FLOSS_STRINGS + 10)
+        self.assertEqual(len(recovered), MAX_FLOSS_STRINGS)
+        self.assertEqual(recovered[0], {"type": "stack", "value": "decoded.example"})
+        self.assertTrue(truncated)
+
     def test_timeout_preserves_completed_output(self):
         from ward.remnux_worker import run_tool
         result = run_tool("fixture", [sys.executable, "-c",
