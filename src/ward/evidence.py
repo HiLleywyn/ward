@@ -405,14 +405,34 @@ class ResultStore:
     @staticmethod
     def _repository_keys(target: str) -> set[str]:
         from urllib.parse import urlparse
-        value = str(target).strip().lower().removesuffix(".git").rstrip("/")
+        value = str(target).strip()
         if not value:
             return set()
-        keys = {value}
-        parsed = urlparse(value)
-        if parsed.hostname and parsed.path.strip("/"):
-            keys.add(parsed.path.strip("/"))
-        return keys
+        if "://" not in value:
+            # Bare owner/repo is GitHub shorthand. Scanner labels for other hosts
+            # include the host; never discard it when constructing an identity.
+            if len(value.split("/")) > 2 and "." in value.split("/", 1)[0]:
+                value = "https://" + value
+            else:
+                try:
+                    owner, name = parse_repository_target(value)
+                except ValueError:
+                    return set()
+                value = f"https://github.com/{owner}/{name}"
+        try:
+            parsed = urlparse(value)
+            if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+                    or parsed.port not in (None, 443) or parsed.query or parsed.fragment):
+                return set()
+        except ValueError:
+            return set()
+        path = parsed.path.rstrip("/").removesuffix(".git").strip("/")
+        if not path:
+            return set()
+        host = parsed.hostname.lower()
+        if host == "github.com":
+            path = path.lower()
+        return {f"https://{host}/{path}"}
 
     def latest_repository_scan(self, target: str, branch: str | None = None) -> dict | None:
         keys = self._repository_keys(target)
