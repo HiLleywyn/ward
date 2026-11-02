@@ -32,6 +32,18 @@ class WebInterfaceTests(unittest.TestCase):
         self.assertIn("@media (prefers-reduced-motion: reduce)", styles)
         self.assertIn("focus-visible", styles)
 
+    def test_developer_page_documents_live_interfaces(self):
+        home = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        page = (WEB_ROOT / "developers.html").read_text(encoding="utf-8")
+        script = (WEB_ROOT / "developers.js").read_text(encoding="utf-8")
+
+        self.assertIn('href="/developers"', home)
+        self.assertIn("https://ward.lley.cat/mcp", page)
+        self.assertIn("https://ward.lley.cat/api/v1", page)
+        self.assertIn('"type": "streamable-http"', page)
+        self.assertIn("ward_submit_scan", page)
+        self.assertIn("navigator.clipboard.writeText", script)
+
 
 if __name__ == "__main__":
     unittest.main()

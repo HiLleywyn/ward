@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Connect tools and agents to Ward through its public REST API and MCP server.">
+  <title>Developers · Ward</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="grid" aria-hidden="true"></div>
+  <main class="developer-page">
+    <header class="developer-header">
+      <a class="back-link" href="/">Ward home</a>
+      <h1>Developers</h1>
+      <p>Use Ward's public scanner, evidence ledger, and reviewed malware records from your own tools.</p>
+    </header>
+
+    <section class="developer-section" aria-labelledby="mcp-title">
+      <div class="developer-title">
+        <div>
+          <h2 id="mcp-title">MCP</h2>
+          <p>Stateless Streamable HTTP. No key or account required.</p>
+        </div>
+        <span class="mode">public</span>
+      </div>
+
+      <div class="endpoint-row">
+        <code>https://ward.lley.cat/mcp</code>
+        <button class="copy-button quiet-button" type="button" data-copy="https://ward.lley.cat/mcp">Copy</button>
+      </div>
+
+      <h3>Client config</h3>
+      <div class="code-block">
+        <button class="copy-button quiet-button" type="button" data-copy-target="mcp-config">Copy</button>
+        <pre id="mcp-config"><code>{
+  "mcpServers": {
+    "ward": {
+      "type": "streamable-http",
+      "url": "https://ward.lley.cat/mcp"
+    }
+  }
+}</code></pre>
+      </div>
+
+      <h3>Connection test</h3>
+      <div class="code-block">
+        <button class="copy-button quiet-button" type="button" data-copy-target="mcp-test">Copy</button>
+        <pre id="mcp-test"><code>curl https://ward.lley.cat/mcp \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ward-client","version":"1"}}}'</code></pre>
+      </div>
+
+      <details class="developer-details">
+        <summary>Available tools <span>10</span></summary>
+        <ul class="tool-list">
+          <li><code>ward_submit_scan</code><span>Scan a public repository or query a SHA-256.</span></li>
+          <li><code>ward_get_scan</code><span>Read scan state and bounded results.</span></li>
+          <li><code>ward_get_report</code><span>Read the terminal verdict, evidence, and limits.</span></li>
+          <li><code>ward_list_scans</code><span>Browse recent scans with cursor pagination.</span></li>
+          <li><code>ward_repository_history</code><span>Recall a repository's observed scan history.</span></li>
+          <li><code>ward_compare_scans</code><span>Compare two completed repository scans.</span></li>
+          <li><code>ward_lookup_artifact</code><span>Query reviewed public SHA-256 evidence.</span></li>
+          <li><code>ward_list_malware_records</code><span>List reviewed, source-backed records.</span></li>
+          <li><code>ward_get_malware_record</code><span>Read one reviewed record.</span></li>
+          <li><code>ward_get_badge</code><span>Generate linked README badge Markdown.</span></li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="developer-section" aria-labelledby="api-title">
+      <div class="developer-title">
+        <div>
+          <h2 id="api-title">REST API</h2>
+          <p>Submit scans, follow their lifecycle, and retrieve evidence as JSON.</p>
+        </div>
+        <a class="text-action" href="/api/v1/openapi.json">OpenAPI 3.1</a>
+      </div>
+
+      <div class="endpoint-row">
+        <code>https://ward.lley.cat/api/v1</code>
+        <button class="copy-button quiet-button" type="button" data-copy="https://ward.lley.cat/api/v1">Copy</button>
+      </div>
+
+      <h3>Submit a repository</h3>
+      <div class="code-block">
+        <button class="copy-button quiet-button" type="button" data-copy-target="api-example">Copy</button>
+        <pre id="api-example"><code>curl https://ward.lley.cat/api/v1/scans \
+  -H "Content-Type: application/json" \
+  --data '{"kind":"repository","url":"https://github.com/owner/repository","ref":"main"}'</code></pre>
+      </div>
+
+      <div class="developer-links">
+        <a href="/api/v1">API index</a>
+        <a href="/api/v1/openapi.json">OpenAPI contract</a>
+        <a href="https://github.com/HiLleywyn/ward/tree/main/integrations/ward-plugin">Plugin package</a>
+        <a href="https://github.com/HiLleywyn/ward/blob/main/docs/API.md">Full documentation</a>
+      </div>
+    </section>
+
+    <section class="developer-section compact-section" aria-labelledby="limits-title">
+      <div class="developer-title">
+        <div>
+          <h2 id="limits-title">Security and limits</h2>
+          <p>Ward performs bounded static inspection. It never executes repository code.</p>
+        </div>
+      </div>
+      <ul class="limit-list">
+        <li>Public HTTPS Git repositories only.</li>
+        <li>One repository worker, with per-client and global rate limits.</li>
+        <li>MCP accepts repository and SHA-256 scans, not file uploads.</li>
+        <li><strong>Unknown</strong> or <strong>Inspected</strong> never means safe.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>By Lleywyn · <a href="/">Scanner</a> · <a href="https://github.com/HiLleywyn/ward">Source</a> · <a href="https://github.com/HiLleywyn/ward/issues/new?template=report.yml">Report a threat</a></footer>
+  <div id="copy-status" class="sr-only" role="status" aria-live="polite"></div>
+  <script src="/developers.js"></script>
+</body>
+</html>

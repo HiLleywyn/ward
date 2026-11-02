@@ -41,7 +41,7 @@ def _handler() -> type[BaseHTTPRequestHandler]:
     coordinator = ScanCoordinator(store, scan_slot)
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "Ward/0.5"
+        server_version = "Ward/0.5.1"
         sys_version = ""
 
         def setup(self):
@@ -346,8 +346,11 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 return
             routes = {
                 "/": (WEB_ROOT / "index.html", "text/html; charset=utf-8"),
+                "/developers": (WEB_ROOT / "developers.html", "text/html; charset=utf-8"),
+                "/developers.html": (WEB_ROOT / "developers.html", "text/html; charset=utf-8"),
                 "/styles.css": (WEB_ROOT / "styles.css", "text/css; charset=utf-8"),
                 "/app.js": (WEB_ROOT / "app.js", "text/javascript; charset=utf-8"),
+                "/developers.js": (WEB_ROOT / "developers.js", "text/javascript; charset=utf-8"),
             }
             if request.path == "/api/indicators":
                 indicator_path = advisory_directory() / "indicators.json"

@@ -138,6 +138,11 @@ class WardAPITests(unittest.TestCase):
         self.assertIsNotNone(page["next_cursor"])
 
     def test_mcp_discovery_tools_and_openapi_resource(self):
+        with urlopen(self.base + "/developers") as response:
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers.get_content_type(), "text/html")
+            self.assertIn("https://ward.lley.cat/mcp", response.read().decode())
+
         status, _, initialized = self.request("/mcp", method="POST", body={
             "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
                 "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "1"}
