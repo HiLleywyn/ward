@@ -99,12 +99,12 @@ def scan_file(data: bytes, filename: str, digest: str) -> dict:
             item["source_url"] for item in inspected["findings"] if item.get("source_url")
         )),
         "verification": {
-            "level": "partial" if inspected["truncated"] else "inspected",
+            "level": "partial" if inspected["partial"] else "inspected",
             "checks": [
                 {"name": "sha256", "status": "completed"},
                 {"name": "known-indicators", "status": "completed"},
                 {"name": "static-rules", "status": "partial" if inspected["truncated"] else "completed"},
-                {"name": "bounded-archive-inspection", "status": "completed"},
+                {"name": "bounded-archive-inspection", "status": "partial" if inspected["partial"] else "completed"},
                 {"name": "behavioral-analysis", "status": "not-run"},
             ],
         },

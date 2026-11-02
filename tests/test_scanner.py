@@ -95,6 +95,15 @@ class RepositoryUrlTests(unittest.TestCase):
 
 
 class StaticInspectionTests(unittest.TestCase):
+    def test_unreadable_archive_marks_inspection_partial(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "opaque.zip"
+            archive.write_bytes(b"not a zip archive")
+            result = inspect_tree(Path(directory))
+
+        self.assertTrue(result["partial"])
+        self.assertIn("archive-unreadable", {finding["kind"] for finding in result["findings"]})
+
     def test_exact_hash_and_suspicious_script_are_reported(self):
         payload = b"known fixture, not live malware"
         digest = hashlib.sha256(payload).hexdigest()

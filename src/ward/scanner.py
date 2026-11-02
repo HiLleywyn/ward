@@ -331,6 +331,10 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
                         })
     rank = {"critical": 0, "high": 1, "medium": 2, "info": 3}
     findings.sort(key=lambda item: (rank.get(item["severity"], 9), item.get("path", ""), item["title"]))
+    archive_incomplete = any(
+        item.get("kind") in {"archive-expansion", "archive-unreadable"}
+        for item in findings
+    )
     return {
         "files": min(file_count, MAX_FILES),
         "bytes": total_bytes,
@@ -339,6 +343,7 @@ def inspect_tree(root: Path, *, indicators: dict | None = None) -> dict:
         "archives": archives,
         "executable_files": executable_files,
         "truncated": truncated,
+        "partial": truncated or archive_incomplete,
         "findings": findings[:100],
     }
 
@@ -442,14 +447,14 @@ def scan_repository(value: str, ref: str | None = None, expected_commit: str | N
         "findings": inspected["findings"],
         "sources": sources,
         "verification": {
-            "level": "partial" if inspected["truncated"] else "inspected",
+            "level": "partial" if inspected["partial"] else "inspected",
             "checks": [
                 {"name": "revision-pinned", "status": "completed"},
                 {"name": "file-inventory", "status": "partial" if inspected["truncated"] else "completed"},
                 {"name": "sha256-inventory", "status": "partial" if inspected["truncated"] else "completed"},
                 {"name": "known-indicators", "status": "completed"},
                 {"name": "static-rules", "status": "partial" if inspected["truncated"] else "completed"},
-                {"name": "bounded-archive-inspection", "status": "completed"},
+                {"name": "bounded-archive-inspection", "status": "partial" if inspected["partial"] else "completed"},
                 {"name": "isolated-build", "status": "not-run"},
                 {"name": "behavioral-analysis", "status": "not-run"},
             ],
