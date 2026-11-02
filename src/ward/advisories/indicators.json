@@ -151,6 +151,22 @@
       "source_url": "https://github.com/sg1331/reimagined-octo-spoon/releases/download/octo/latest_release.zip",
       "campaign": "gerhodd.com GitHub Pages Electron delivery wave",
       "validation_notes": "Derived SHA-256 of the 604,800-byte JavaScript plaintext recovered by Ward's bounded AES-CBC decoder from runtimec0cc.dat. Static control-flow identifiers and the application-ready path establish Defender exclusion, elevation, encrypted-payload execution, environment checking, installation, and self-destruction routines. The script was not executed and its final embedded payload remains unresolved."
+    },
+    {
+      "sha256": "b4b59ebd4c1fd958ad0b91f400221a9191c00fe409a3ba533b1656cd0654df24",
+      "status": "confirmed",
+      "first_seen": "2026-11-02",
+      "source_url": "https://librehub.click/download.php?id=filmora",
+      "campaign": "LibreHub cracked-software loader wave",
+      "validation_notes": "Ward independently hashed the password-protected Filmora ZIP collected from the public LibreHub route. It was extracted only inside ward-remnux:0.8.0 with network disabled and read-only sample mounts. No member was executed."
+    },
+    {
+      "sha256": "400b6b3003a85813cf6553c51ae0e24f7652c49d84131a895cb27e9c30bd2cc0",
+      "status": "confirmed",
+      "first_seen": "2026-11-02",
+      "source_url": "https://librehub.click/download.php?id=filmora",
+      "campaign": "LibreHub cracked-software loader wave",
+      "validation_notes": "Ward independently hashed Installer.exe from the collected Filmora archive. Bounded static PE reconstruction and decompilation established ICMLuaUtil CoGetObject and ShellExec auto-elevation, self-relaunch with marker RQFTIRXS, and PEB process masquerading as explorer.exe. The PE was not executed."
     }
   ],
   "notes": [

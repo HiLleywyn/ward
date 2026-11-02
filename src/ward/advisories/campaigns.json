@@ -508,6 +508,86 @@
         }
       ],
       "validation_notes": "All eight lure repositories and their GitHub Pages carriers were live and pinned on 2026-11-02. Ward decoded each carrier without executing its JavaScript and confirmed that every recovered page targeted gerhodd.com. Public October 29-30 urlscan captures establish redirects from randomized gerhodd.com result paths to the sg1331/reimagined-octo-spoon octo release. The current release asset was replaced on October 31, and Ward statically extracted its ZIP, NSIS, 7z, ASAR, and AES-CBC layers inside Kali without executing them. The current gerhodd.com root serves a decoy rather than the historical route. The evidence establishes a common delivery chain and confirmed malicious mechanisms, but it does not establish an operator identity, final malware-family name, or the unresolved locale.dat payload's complete behavior."
+    },
+    {
+      "id": "2026-11-librehub-cracked-software-loader",
+      "title": "LibreHub cracked-software COM auto-elevation loader wave",
+      "status": "confirmed-with-repository-artifacts",
+      "first_public_report": "2026-11-02",
+      "impersonated_projects": [
+        "Adobe After Effects", "Adobe Acrobat Pro", "Adobe Illustrator", "Archicad",
+        "Autodesk 3ds Max", "Autodesk Maya", "Blender", "CapCut Pro", "Cinema 4D",
+        "CorelDRAW Graphics Suite", "DaVinci Resolve Studio", "Filmora", "FL Studio",
+        "Houdini", "Movavi Video Editor", "OBS Studio", "SketchUp Pro", "Sony Vegas Pro",
+        "TradeUp"
+      ],
+      "reported_behavior": [
+        "forty live GitHub README lures sharing password LibreHub#!",
+        "nineteen product-specific paths on one delivery domain",
+        "strided and XOR-obfuscated PE carrier reconstruction",
+        "ICMLuaUtil CoGetObject and ShellExec auto-elevation",
+        "self-relaunch with marker RQFTIRXS",
+        "PEB process-parameter and loader-entry masquerading as explorer.exe"
+      ],
+      "confirmed_repository_urls": [
+        "https://github.com/basaltmonitorice/blender-3d-full",
+        "https://github.com/BoundaryTick39/Davinci-Resolve-Studio-Premium-2026-Last-Version",
+        "https://github.com/Breakluguide/CupCat-Video-Editor-Ai",
+        "https://github.com/BufferRescuerDawn/Filmora-2026-Video-Editor",
+        "https://github.com/ChunkSheriffHole39/FL-Studio-Ai-Music",
+        "https://github.com/Coreirmemorialize/Illustrator-Software-2026",
+        "https://github.com/danberg-io2089d7/adobe-after-effects-2026-version",
+        "https://github.com/drivecassowaryarcade/Sony-Vegas-Pro-Ultimate-Toolkit",
+        "https://github.com/energymoosespeak/SketchUp-Pro-Last-Version-2026",
+        "https://github.com/FangGovernorFilter/CupCat-VideoEditor-Ai",
+        "https://github.com/FlagSoulTrack/SketchUp-Pro-Last-Version",
+        "https://github.com/ForkMoonSewer/Filmora-2026-Video-Editing",
+        "https://github.com/GlowPoemWatt/Acrobat-Pro-2026-Last-Version",
+        "https://github.com/GrottoRatDeem/FL-Studio",
+        "https://github.com/hkhan50329/SketchUp-Pro-2026-Last-Version",
+        "https://github.com/jake-techeng20l8/adobe-after-effects-version-2026",
+        "https://github.com/Kindacrossreflect/Adobe-AfterEffects-2026",
+        "https://github.com/KnightDominate/Filmora-Video-Editor-2026",
+        "https://github.com/Knitforimprove/Illustrator-2026-Software",
+        "https://github.com/KnotBuntingHook/SonyVegas-Pro-Ultimate-Toolkit-2026",
+        "https://github.com/Manacleunshovel/Movavi-VideoEditor-2026",
+        "https://github.com/mark-s-ops2004k6/Blender-3d-2026-Last-Version",
+        "https://github.com/maxnx2004k3/cupcat-video-editor",
+        "https://github.com/nikita-ali-x94f4/coreldraw-2026-version",
+        "https://github.com/ninjakindrespect/OBS-Countdown-Timer-Overlay-Timer-Streaming-2026",
+        "https://github.com/OctagonSailmaker/AutodeskMaya-3D-2026",
+        "https://github.com/oliverparkio89w4/houdini-2026-version",
+        "https://github.com/oliversilva-dev2094b2/CupCat-Video-Editor-Ai",
+        "https://github.com/Petaniscreen/Autodesk-Maya-3D-2026",
+        "https://github.com/Realibnforum/3D-Modeling-and-Effects-2027",
+        "https://github.com/riverforemanstudio/Adobe-AfterEffects-2026-Version",
+        "https://github.com/sam-kumarcode03m4/Archicad-Work-Tools",
+        "https://github.com/samuraiseekerrefresh/tradeup-2026",
+        "https://github.com/sergey-ali-lab2098c2/Blender-3D-Modeling-2026",
+        "https://github.com/ServerExpiate/CupCat-Video-Editor-2026",
+        "https://github.com/StandardSpearShift/SonyVegas-Pro-2026",
+        "https://github.com/StoneLadyWharf/C4d-Pro-2026",
+        "https://github.com/towerterrapinatone/Illustrator-Vector-Graphics-2026",
+        "https://github.com/UnitPhaseChateau/AutodeskMaya-2026",
+        "https://github.com/WallSoulCleanse/Acrobat-Pro-2026-Version"
+      ],
+      "confirmed_sha256": [
+        "b4b59ebd4c1fd958ad0b91f400221a9191c00fe409a3ba533b1656cd0654df24",
+        "400b6b3003a85813cf6553c51ae0e24f7652c49d84131a895cb27e9c30bd2cc0"
+      ],
+      "evidence": [
+        {
+          "url": "https://github.com/ForkMoonSewer/Filmora-2026-Video-Editing/blob/9ca25948d219742af44ef0d5db6c00bd5ac3d12d/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://librehub.click/download.php?id=filmora",
+          "type": "collected-distribution-artifact",
+          "attribution": "Ward public evidence collection"
+        }
+      ],
+      "validation_notes": "Ward independently pinned 40 live repositories across 19 LibreHub download IDs on 2026-11-02. The Filmora route yielded a password-protected ZIP and the exact Installer.exe before the service developed a TLS protocol failure. Static analysis inside a network-disabled ward-remnux:0.8.0 container established ICMLuaUtil auto-elevation and explorer.exe process masquerading. Later HTTP reached Cloudflare but HTTPS failed in curl and a real browser, so Ward does not claim the remaining 18 routes returned byte-identical archives. The evidence establishes a shared malicious delivery service and repository participation, not an account-operator identity."
     }
   ]
 }

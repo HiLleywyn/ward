@@ -30,6 +30,12 @@ class PublicWebTests(unittest.TestCase):
                         self.assertEqual(json.load(response)['status'], 'FAIL')
                     self.assertEqual(get('/api/history'), {'observations':[]})
                     reviewed = get('/api/reviewed')
+                    from ward.data import load_malware_records
+                    librehub = {
+                        item['repository']
+                        for item in load_malware_records()
+                        if item['malware'] == 'LibreHub COM auto-elevation and process-masquerading loader'
+                    }
                     self.assertEqual(
                         {
                             'gpt-5-6/gpt-5-6.github.io',
@@ -91,7 +97,7 @@ class PublicWebTests(unittest.TestCase):
                             'atheerhussein818-sketch/evolve-mod-lab',
                             '24se02ml062/Decky-Proton-Cheats-Manager-Companion',
                             'sg1331/reimagined-octo-spoon',
-                        },
+                        } | librehub,
                         {item['repository'] for item in reviewed['records']},
                     )
                     self.assertNotIn('repositories', reviewed)

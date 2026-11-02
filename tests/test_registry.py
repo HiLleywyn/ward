@@ -366,6 +366,46 @@ class RegistryTests(unittest.TestCase):
         )
         self.assertEqual(digests, set(campaign["confirmed_sha256"]))
 
+    def test_librehub_wave_keeps_all_forty_repository_records(self):
+        from ward.data import advisory_directory, load_malware_records
+
+        directory = advisory_directory()
+        indicators = json.loads((directory / "indicators.json").read_text(encoding="utf-8"))
+        campaigns = json.loads((directory / "campaigns.json").read_text(encoding="utf-8"))
+        records = [
+            item
+            for item in load_malware_records(directory)
+            if item["malware"] == "LibreHub COM auto-elevation and process-masquerading loader"
+        ]
+        digests = {
+            "b4b59ebd4c1fd958ad0b91f400221a9191c00fe409a3ba533b1656cd0654df24",
+            "400b6b3003a85813cf6553c51ae0e24f7652c49d84131a895cb27e9c30bd2cc0",
+        }
+
+        self.assertEqual(40, len(records))
+        self.assertEqual(40, len({item["repository"].lower() for item in records}))
+        self.assertEqual(19, len({item["download_id"] for item in records}))
+        self.assertTrue(all(item["status"] == "FAIL" for item in records))
+        self.assertTrue(all("/blob/" in item["source_url"] for item in records))
+        self.assertEqual(
+            digests,
+            {
+                item["sha256"]
+                for item in indicators["indicators"]
+                if item.get("campaign") == "LibreHub cracked-software loader wave"
+            },
+        )
+        campaign = next(
+            item
+            for item in campaigns["campaigns"]
+            if item["id"] == "2026-11-librehub-cracked-software-loader"
+        )
+        self.assertEqual(
+            {f"https://github.com/{item['repository']}" for item in records},
+            set(campaign["confirmed_repository_urls"]),
+        )
+        self.assertEqual(digests, set(campaign["confirmed_sha256"]))
+
 
 if __name__ == "__main__":
     unittest.main()

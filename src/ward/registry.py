@@ -48,8 +48,7 @@ def validate_registry(directory: Path) -> list[RegistryProblem]:
     projects = _load(directory / "project-locations.json", problems)
     campaigns = _load(directory / "campaigns.json", problems)
     records = _load(directory / "malware-records.json", problems)
-    record_sets_path = directory / "malware-record-sets.json"
-    if record_sets_path.exists():
+    for record_sets_path in sorted(directory.glob("malware-record-set*.json")):
         _load(record_sets_path, problems)
     seen_record_repositories: set[str] = set()
     try:
