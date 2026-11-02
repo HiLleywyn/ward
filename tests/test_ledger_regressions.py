@@ -1,12 +1,15 @@
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
 from ward.evidence import ResultStore
+from ward.analysis import result_digest
+from ward.api import report_for_job
 from ward.views import badge_state
 
 
-class RepositoryIdentityTests(unittest.TestCase):
+class LedgerStoreCase(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -21,6 +24,8 @@ class RepositoryIdentityTests(unittest.TestCase):
             'scanned_at': job['created_at']})
         return self.store.scan_job(job['id'])
 
+
+class RepositoryIdentityTests(LedgerStoreCase):
     def test_hosts_never_share_latest_badge_or_history(self):
         self.scan('https://gitlab.com/repro/project.git')
         for target in ('repro/project', 'https://github.com/repro/project.git', 'https://example.org/repro/project'):
@@ -55,3 +60,45 @@ class RepositoryIdentityTests(unittest.TestCase):
                        'https://github.com:444/repro/project', 'https://github.com/repro/project#other'):
             with self.subTest(target=target), self.assertRaises(ValueError):
                 self.store.latest_repository_scan(target)
+
+
+class LedgerAssessmentTests(LedgerStoreCase):
+    def test_antivirus_evidence_reaches_history_comparison_and_ledger(self):
+        from ward.views import repository_ledger_page
+        url = 'https://github.com/repro/project'
+        base = self.scan(url, status='Unverified')
+        data = b'harmless fixture'
+        digest = hashlib.sha256(data).hexdigest()
+        head, _ = self.store.create_scan_job(kind='repository', target=url, request_hash='a' * 64,
+            idempotency_key=None, cancel_token_hash='b' * 64, requested_ref='main')
+        self.store.start_scan_job(head['id'])
+        original = {'repository': 'repro/project', 'repository_url': url, 'branch': 'main',
+            'commit': 'b' * 40, 'status': 'Unverified', 'scanned_at': head['created_at'], 'findings': [],
+            'artifacts': [{'path': 'sample.exe', 'sha256': digest}]}
+        original['evidence_digest'] = result_digest(original)
+        self.store.complete_scan_job(head['id'], original)
+        analysis_id = self.store.analyses.enqueue(head['id'], 'sample.exe', digest, data)
+        self.assertEqual(self.store.compare_repository_scans(base['id'], head['id'])['assessment'], 'no_finding_change')
+        claimed = self.store.analyses.claim('remnux')
+        evidence = {'sha256': digest, 'coverage': 'partial', 'engines': [
+            {'name': 'clamav', 'status': 'partial', 'detections': ['Test.Signature']}]}
+        evidence['evidence_digest'] = result_digest(evidence)
+        self.store.analyses.finish(analysis_id, claimed['claim_token'], result=evidence)
+
+        history = self.store.repository_history(url)
+        self.assertEqual(history['scans'][-1]['status'], 'Malicious')
+        self.assertEqual(history['scans'][-1]['static_status'], 'Unverified')
+        self.assertEqual(history['scans'][-1]['static_evidence_digest'], original['evidence_digest'])
+        self.assertNotIn('evidence_digest', history['scans'][-1])
+        self.assertEqual(history['scans'][-1]['analysis_evidence'][0]['evidence_digest'], evidence['evidence_digest'])
+        self.assertEqual(history['transitions'][0]['to_status'], 'Malicious')
+        comparison = self.store.compare_repository_scans(base['id'], head['id'])
+        self.assertEqual(comparison['assessment'], 'new_findings_detected')
+        self.assertEqual(comparison['new_findings'][0]['analysis_id'], analysis_id)
+        self.assertEqual(comparison['new_findings'][0]['sha256'], digest)
+        self.assertEqual(comparison['head']['status'], 'Malicious')
+        self.assertIn('Malicious', repository_ledger_page(history).decode())
+        job = self.store.scan_job(head['id'])
+        self.assertEqual(job['result'], original)
+        self.assertEqual(report_for_job(job)['verdict']['status'], 'malicious')
+        self.assertEqual(badge_state(job)[1], 'malware detected')

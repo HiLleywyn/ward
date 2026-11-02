@@ -359,7 +359,7 @@ class ResultStore:
         all_results = []
         for scan_id, payload in rows:
             result = json.loads(payload)
-            item = {"scan_id": scan_id, **result}
+            item = self._repository_result(scan_id, result)
             all_results.append(item)
             if keys & self._repository_keys(result.get("repository_url") or result.get("repository") or ""):
                 scans.append(item)
@@ -461,6 +461,25 @@ class ResultStore:
             finding.get("sha256"), finding.get("title"),
         )
 
+    def _repository_result(self, scan_id: str, result: dict, analyses: list | None = None) -> dict:
+        """Read-time projection; persisted scan evidence and its digest stay intact."""
+        from .analysis import analysis_assessment
+        analyses = self.analyses.list(scan_id) if analyses is None else analyses
+        assessment = analysis_assessment({"result": result, "analyses": analyses})
+        projected = dict(result, scan_id=scan_id, static_status=result.get("status"),
+                         status=assessment["status"], analysis_assessment=assessment,
+                         findings=[*result.get("findings", []), *assessment["findings"]])
+        # The original digest covers the static document, not this derived view.
+        if "evidence_digest" in projected:
+            projected["static_evidence_digest"] = projected.pop("evidence_digest")
+        projected["analysis_evidence"] = [
+            {"analysis_id": item["id"], "engine": item["engine"], "path": item["path"],
+             "sha256": item["sha256"], "evidence_digest": item["result"].get("evidence_digest"),
+             "updated_at": item["updated_at"]}
+            for item in analyses if item.get("status") == "completed" and item.get("result")
+        ]
+        return projected
+
     @classmethod
     def _compare_results(cls, base: dict, head: dict) -> dict:
         base_findings = {cls._finding_key(item): item for item in base.get("findings", [])}
@@ -488,11 +507,11 @@ class ResultStore:
         for job in (base_job, head_job):
             if job["kind"] != "repository" or job["status"] != "completed" or not job.get("result"):
                 raise ValueError("Comparisons require two completed repository scans")
-        base = {"scan_id": base_scan_id, **base_job["result"]}
-        head = {"scan_id": head_scan_id, **head_job["result"]}
+        base = self._repository_result(base_scan_id, base_job["result"], base_job["analyses"])
+        head = self._repository_result(head_scan_id, head_job["result"], head_job["analyses"])
         return {
-            "base": {key: base.get(key) for key in ("scan_id", "repository", "repository_url", "branch", "commit", "status", "scanned_at")},
-            "head": {key: head.get(key) for key in ("scan_id", "repository", "repository_url", "branch", "commit", "status", "scanned_at")},
+            "base": {key: base.get(key) for key in ("scan_id", "repository", "repository_url", "branch", "commit", "status", "scanned_at", "static_status", "static_evidence_digest", "analysis_evidence", "analysis_assessment")},
+            "head": {key: head.get(key) for key in ("scan_id", "repository", "repository_url", "branch", "commit", "status", "scanned_at", "static_status", "static_evidence_digest", "analysis_evidence", "analysis_assessment")},
             **self._compare_results(base, head),
         }
 
