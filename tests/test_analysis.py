@@ -4,11 +4,13 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 
 from ward.analysis import result_digest
 from ward.api import report_for_job
 from ward.evidence import ResultStore
 from ward.windows import _guest_command, _sandbox_id, sandbox_config
+from ward.windows_worker import CREATE_NO_WINDOW, bridge
 
 
 class AnalysisQueueTests(unittest.TestCase):
@@ -103,6 +105,12 @@ class AnalysisQueueTests(unittest.TestCase):
 
 
 class WindowsPolicyTests(unittest.TestCase):
+    @patch("ward.windows_worker.subprocess.run")
+    def test_worker_bridge_never_opens_a_console_window(self, run):
+        run.return_value.stdout = "{}"
+        bridge("ward", "heartbeat")
+        self.assertEqual(run.call_args.kwargs["creationflags"], CREATE_NO_WINDOW)
+
     def test_sandbox_has_only_job_transfer_folders_and_all_network_devices_disabled(self):
         from xml.etree import ElementTree
         root = ElementTree.fromstring(sandbox_config(Path("job/input"), Path("job/output")))
@@ -121,6 +129,12 @@ class WindowsPolicyTests(unittest.TestCase):
         self.assertEqual(command[:4], ["wsb.exe", "exec", "--id", sandbox_id])
         self.assertEqual(command[command.index("--run-as") + 1], "System")
         self.assertIn(r"C:\WardInput\collect.ps1", command[command.index("--command") + 1])
+
+    def test_guest_collector_bounds_launch_and_defender_queries(self):
+        guest = Path("src/ward/windows_guest.ps1").read_text(encoding="utf-8")
+        self.assertIn("Wait-Job -Job $launchJob -Timeout 20", guest)
+        self.assertIn("Wait-Job -Job $defenderJob -Timeout 10", guest)
+        self.assertIn("executed=$executed", guest)
 
     def test_only_explicit_sandbox_identifiers_are_used_for_teardown(self):
         expected = "01234567-1234-1234-1234-0123456789ab"

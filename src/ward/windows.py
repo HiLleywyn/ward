@@ -10,11 +10,14 @@ import shutil
 import subprocess
 import tempfile
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
 
 from .analysis import result_digest
 from .remnux import MAX_SAMPLE_BYTES
+
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def sandbox_config(input_path: Path, output_path: Path) -> str:
@@ -58,6 +61,7 @@ def _sandbox_id(value):
 
 
 def _guest_command(executable: str, sandbox_id: str) -> list[str]:
+    # The unattended worker has no active guest login, so ExistingLogin cannot run the collector.
     return [
         executable, "exec", "--id", sandbox_id,
         "--command", r"powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\WardInput\collect.ps1",
@@ -65,7 +69,10 @@ def _guest_command(executable: str, sandbox_id: str) -> list[str]:
     ]
 
 
-def analyze_windows(data: bytes, *, expected_sha256: str) -> dict:
+def analyze_windows(
+    data: bytes, *, expected_sha256: str,
+    heartbeat: Callable[[], None] | None = None,
+) -> dict:
     executable = shutil.which("wsb.exe") if os.name == "nt" else None
     if executable is None:
         raise ValueError("Windows Sandbox CLI is unavailable; finish host setup and restart Windows")
@@ -80,11 +87,18 @@ def analyze_windows(data: bytes, *, expected_sha256: str) -> dict:
         (inputs / "collect.ps1").write_text(Path(__file__).with_name("windows_guest.ps1").read_text(encoding="utf-8"), encoding="utf-8")
         (inputs / "request.json").write_text(json.dumps({"sha256": expected_sha256, "content_base64": base64.b64encode(data).decode()}), encoding="utf-8")
         # Refuse to attach to or stop a sandbox that belongs to another task.
-        existing = subprocess.run([executable, "list", "--raw"], capture_output=True, text=True, timeout=15, check=True)
+        existing = subprocess.run(
+            [executable, "list", "--raw"], capture_output=True, text=True,
+            timeout=15, check=True, creationflags=CREATE_NO_WINDOW,
+        )
         existing_value = json.loads(existing.stdout or "[]")
         if _sandbox_id(existing_value):
             raise ValueError("Another Windows Sandbox is active; it was left untouched")
-        started = subprocess.run([executable, "start", "--config", sandbox_config(inputs, outputs), "--raw"], capture_output=True, text=True, timeout=90, check=True)
+        started = subprocess.run(
+            [executable, "start", "--config", sandbox_config(inputs, outputs), "--raw"],
+            capture_output=True, text=True, timeout=90, check=True,
+            creationflags=CREATE_NO_WINDOW,
+        )
         sandbox_id = _sandbox_id(json.loads(started.stdout))
         if not sandbox_id:
             raise ValueError("Windows Sandbox did not return a valid instance ID")
@@ -93,10 +107,15 @@ def analyze_windows(data: bytes, *, expected_sha256: str) -> dict:
             execution = subprocess.Popen(
                 _guest_command(executable, sandbox_id),
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                creationflags=CREATE_NO_WINDOW,
             )
             deadline = time.monotonic() + 180
+            next_heartbeat = time.monotonic() + 30
             report_path = outputs / "result.json"
             while time.monotonic() < deadline:
+                if heartbeat is not None and time.monotonic() >= next_heartbeat:
+                    heartbeat()
+                    next_heartbeat = time.monotonic() + 30
                 if execution.poll() not in (None, 0):
                     stdout, stderr = execution.communicate(timeout=1)
                     detail = (stderr or stdout or "unknown error").strip()[:300]
@@ -123,7 +142,10 @@ def analyze_windows(data: bytes, *, expected_sha256: str) -> dict:
                 except subprocess.TimeoutExpired:
                     execution.kill()
                     execution.wait(timeout=5)
-            subprocess.run([executable, "stop", "--id", sandbox_id], capture_output=True, timeout=30, check=True)
+            subprocess.run(
+                [executable, "stop", "--id", sandbox_id], capture_output=True,
+                timeout=30, check=True, creationflags=CREATE_NO_WINDOW,
+            )
         report = {
             "schema": "ward-windows-behavior-v1", "sha256": expected_sha256,
             "analyzed_at": datetime.now(timezone.utc).isoformat(),

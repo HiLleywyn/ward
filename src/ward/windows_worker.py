@@ -10,13 +10,14 @@ import shutil
 import subprocess
 import time
 
-from .windows import analyze_windows
+from .windows import CREATE_NO_WINDOW, analyze_windows
 
 
 def bridge(container, action, payload=None):
     completed = subprocess.run(
         ["docker", "exec", "-i", container, "python", "-m", "ward", "worker-bridge", "--engine", "windows", action],
         input=json.dumps(payload), capture_output=True, text=True, encoding="utf-8", timeout=30, check=True,
+        creationflags=CREATE_NO_WINDOW,
     )
     return json.loads(completed.stdout)
 
@@ -41,7 +42,10 @@ def run_windows_worker(container="ward", *, once=False):
         if job:
             try:
                 data = base64.b64decode(job.pop("content_base64"), validate=True)
-                result = analyze_windows(data, expected_sha256=job["sha256"])
+                result = analyze_windows(
+                    data, expected_sha256=job["sha256"],
+                    heartbeat=lambda: bridge(container, "heartbeat"),
+                )
                 bridge(container, "finish", {"id": job["id"], "claim_token": job["claim_token"], "result": result})
             except (OSError, ValueError, subprocess.SubprocessError) as exc:
                 bridge(container, "finish", {"id": job["id"], "claim_token": job["claim_token"], "error": str(exc)[:500]})

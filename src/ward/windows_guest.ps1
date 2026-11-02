@@ -33,13 +33,34 @@ $events = @()
 $telemetryErrors = @()
 $subscription = $null
 $process = $null
+$rootPid = $null
+$executed = $false
 $launchError = $null
 try {
     $subscription = Register-CimIndicationEvent -Query 'SELECT * FROM Win32_ProcessStartTrace' -SourceIdentifier WardProcessStart
 } catch { $telemetryErrors += $_.Exception.Message }
-try {
-    $process = Start-Process -FilePath $sample -WorkingDirectory $root -PassThru -ErrorAction Stop
-} catch { $launchError = $_.Exception.Message }
+$launchJob = Start-Job -ScriptBlock {
+    param($SamplePath, $WorkingDirectory)
+    try {
+        $started = Start-Process -FilePath $SamplePath -WorkingDirectory $WorkingDirectory -PassThru -ErrorAction Stop
+        [pscustomobject]@{ id = [int]$started.Id; error = $null }
+    } catch {
+        [pscustomobject]@{ id = $null; error = $_.Exception.Message }
+    }
+} -ArgumentList $sample, $root
+if (Wait-Job -Job $launchJob -Timeout 20) {
+    $launchResult = Receive-Job -Job $launchJob
+    $launchError = $launchResult.error
+    if ($launchResult.id) {
+        $rootPid = [int]$launchResult.id
+        $executed = $true
+        $process = Get-Process -Id $rootPid -ErrorAction SilentlyContinue
+    }
+} else {
+    $launchError = 'Sample launch exceeded the 20 second limit'
+    Stop-Job -Job $launchJob -ErrorAction SilentlyContinue
+}
+Remove-Job -Job $launchJob -Force -ErrorAction SilentlyContinue
 $deadline = (Get-Date).AddSeconds(60)
 if ($process) {
     while ((Get-Date) -lt $deadline) {
@@ -58,8 +79,8 @@ $afterFiles = Get-ProfileFiles
 $changed = @($afterFiles.Keys | Where-Object { -not $beforeFiles.ContainsKey($_) -or $beforeFiles[$_] -ne $afterFiles[$_] } | Select-Object -First 200)
 $afterRun = Get-RunKeys
 $descendantIds = @()
-if ($process) {
-    $descendantIds = @($process.Id)
+if ($rootPid) {
+    $descendantIds = @($rootPid)
     for ($round = 0; $round -lt 10; $round++) {
         foreach ($entry in $events) {
             if ($entry.parent_pid -in $descendantIds -and $entry.pid -notin $descendantIds) { $descendantIds += $entry.pid }
@@ -67,12 +88,21 @@ if ($process) {
     }
 }
 $defender = @()
-try { $defender = @(Get-MpThreatDetection -ErrorAction Stop | Select-Object -First 20 ThreatID,InitialDetectionTime,ActionSuccess,Resources) }
-catch { $telemetryErrors += 'Windows Defender telemetry unavailable' }
+$defenderJob = Start-Job -ScriptBlock {
+    Get-MpThreatDetection -ErrorAction Stop | Select-Object -First 20 ThreatID,InitialDetectionTime,ActionSuccess,Resources
+}
+if (Wait-Job -Job $defenderJob -Timeout 10) {
+    try { $defender = @(Receive-Job -Job $defenderJob -ErrorAction Stop) }
+    catch { $telemetryErrors += 'Windows Defender telemetry unavailable' }
+} else {
+    $telemetryErrors += 'Windows Defender telemetry exceeded the 10 second limit'
+    Stop-Job -Job $defenderJob -ErrorAction SilentlyContinue
+}
+Remove-Job -Job $defenderJob -Force -ErrorAction SilentlyContinue
 $result = @{
     sha256=$digest
-    executed=[bool]$process
-    root_pid=$(if ($process) {$process.Id} else {$null})
+    executed=$executed
+    root_pid=$rootPid
     launch_error=$launchError
     processes=@($events | Where-Object {$_.pid -in $descendantIds})
     profile_changes=$changed

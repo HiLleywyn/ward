@@ -14,6 +14,7 @@ than silently downgrading them.
 - The output mapping is job-specific, monitored, and limited to bounded JSON telemetry.
 - No personal folder, credential, browser profile, USB device, or service secret is mapped.
 - Ward refuses to attach to or stop a Sandbox instance it did not create.
+- The unattended controller uses the headless `wsb` CLI and suppresses host console windows.
 
 The guest runs for at most 60 seconds inside a 180-second outer deadline. It
 records process starts, profile file changes, selected startup registry keys,

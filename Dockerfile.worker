@@ -1,5 +1,5 @@
 FROM docker:cli AS client
-FROM ward:0.6.1
+FROM ward
 USER root
 COPY --from=client /usr/local/bin/docker /usr/local/bin/docker
 USER 10001:10001
