@@ -45,9 +45,16 @@ def _python_upload_findings(tree: ast.AST, path: str) -> list[dict]:
             if isinstance(statement, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and statement.value is not None:
                 targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
                 assigned = set().union(*(names(target) for target in targets))
-                if SENSITIVE_PATH.search(constants(statement.value)) or names(statement.value) & paths:
+                path_value = SENSITIVE_PATH.search(constants(statement.value)) or names(statement.value) & paths
+                secret_value = reads_secret(statement.value) or names(statement.value) & tainted
+                if isinstance(statement, ast.AugAssign):
+                    path_value = path_value or assigned & paths
+                    secret_value = secret_value or assigned & tainted
+                if path_value:
                     paths.update(assigned)
-                if reads_secret(statement.value) or names(statement.value) & tainted:
+                else:
+                    paths.difference_update(assigned)
+                if secret_value:
                     tainted.update(assigned)
                 else:
                     tainted.difference_update(assigned)
@@ -73,12 +80,28 @@ def _python_upload_findings(tree: ast.AST, path: str) -> list[dict]:
                             "title": "Sensitive local data sent to a network API", "path": path, "line": call.lineno,
                             "evidence_type": "source-behavior",
                             "detail": "A file-read flow involving wallet, browser credential, key, or configuration data reaches an upload call. Review consent and destination; the script was not executed."})
-            for field in ("body", "orelse", "finalbody"):
-                nested = getattr(statement, field, None)
-                if isinstance(nested, list):
-                    visit_block(nested, paths, tainted)
-            for handler in getattr(statement, "handlers", []):
-                visit_block(handler.body, paths, tainted)
+            if isinstance(statement, ast.If):
+                left = visit_block(statement.body, paths, tainted)
+                right = visit_block(statement.orelse, paths, tainted)
+                paths, tainted = left[0] | right[0], left[1] | right[1]
+            elif isinstance(statement, (ast.For, ast.AsyncFor, ast.While)):
+                body_paths, body_tainted = visit_block(statement.body, paths, tainted)
+                # A loop may execute zero times, or exit through a break.
+                paths, tainted = paths | body_paths, tainted | body_tainted
+                else_paths, else_tainted = visit_block(statement.orelse, paths, tainted)
+                paths, tainted = paths | else_paths, tainted | else_tainted
+            elif isinstance(statement, (ast.With, ast.AsyncWith)):
+                paths, tainted = visit_block(statement.body, paths, tainted)
+            elif isinstance(statement, ast.Try):
+                body_paths, body_tainted = visit_block(statement.body, paths, tainted)
+                normal = visit_block(statement.orelse, body_paths, body_tainted)
+                # Exceptions may occur before the body's last assignment.
+                alternatives = [normal] + [visit_block(handler.body, paths | body_paths, tainted | body_tainted)
+                                           for handler in statement.handlers]
+                paths = set().union(*(state[0] for state in alternatives))
+                tainted = set().union(*(state[1] for state in alternatives))
+                paths, tainted = visit_block(statement.finalbody, paths, tainted)
+        return paths, tainted
 
     visit_block(tree.body)
     return findings
