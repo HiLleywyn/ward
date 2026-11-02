@@ -3,9 +3,33 @@ from __future__ import annotations
 
 import time
 import hashlib
+import threading
+from contextlib import contextmanager
 
 from .evidence import default_store
-from .remnux import analyze_remnux
+from .remnux import WORKER_TIMEOUT, analyze_remnux
+
+
+@contextmanager
+def analysis_heartbeat(queue, *, interval=30, lifetime=WORKER_TIMEOUT + 30):
+    """Renew availability during bounded work, never indefinitely for a hung call."""
+    stop = threading.Event()
+    deadline = time.monotonic() + lifetime
+    queue.heartbeat("remnux")
+
+    def renew():
+        while not stop.wait(interval):
+            if time.monotonic() >= deadline:
+                return
+            queue.heartbeat("remnux")
+
+    thread = threading.Thread(target=renew, name="remnux-heartbeat", daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join()
 
 
 def run_worker(*, once=False):
@@ -19,7 +43,8 @@ def run_worker(*, once=False):
         job = store.analyses.claim("remnux")
         if job:
             try:
-                result = analyze_remnux(job["data"], expected_sha256=job["sha256"])
+                with analysis_heartbeat(store.analyses):
+                    result = analyze_remnux(job["data"], expected_sha256=job["sha256"])
                 store.analyses.finish(job["id"], job["claim_token"], result=result)
             except Exception as exc:
                 store.analyses.finish(job["id"], job["claim_token"], error=str(exc))
