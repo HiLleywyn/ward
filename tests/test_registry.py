@@ -304,6 +304,67 @@ class RegistryTests(unittest.TestCase):
             set(campaign["confirmed_repository_urls"]),
         )
 
+    def test_gerhodd_wave_is_bound_to_nine_live_repositories(self):
+        from ward.data import advisory_directory, load_malware_records
+
+        directory = advisory_directory()
+        indicators = json.loads((directory / "indicators.json").read_text(encoding="utf-8"))
+        records = load_malware_records(directory)
+        campaigns = json.loads((directory / "campaigns.json").read_text(encoding="utf-8"))
+        digests = {
+            "0d1d35921e9635a8aba86b6a60a65780b64f28ee48f0adc512bd79cd899aaa03",
+            "87b2a24f27047b5528025296377f862876e6ed7e6f7e2c2fc212b8de3a724c9b",
+            "7c4ca1b7d3816ffd78f5e9f981353c407f0cab38ae9878b367caa0e746b0fde5",
+            "9395dcfbf5eee3573dda3ce3576908475c73dc0f2ecb7ef15a5ff85b4ef72d09",
+            "e325885dea1fb0c4d3bf567513e73f239a9b598915484073b13cb03b6b13a831",
+        }
+        repositories = {
+            "Mohit1899/Phasmo-Vault-Forge",
+            "allmonstar086-jpg/Cyber-Doge-Coin-Forge",
+            "zenamc/Valheim-Einherjar-Menu",
+            "Amogus2271/Zombies-Retreat-Save-Forge",
+            "prathviindusanalytics-netizen/Hollow-Viewer",
+            "linconlou/wemod-deck-companion",
+            "atheerhussein818-sketch/evolve-mod-lab",
+            "24se02ml062/Decky-Proton-Cheats-Manager-Companion",
+            "sg1331/reimagined-octo-spoon",
+        }
+
+        wave_records = [
+            item
+            for item in records
+            if item["repository"] in repositories
+            and item["malware"]
+            in {
+                "Obfuscated GitHub Pages to encrypted Electron loader delivery chain",
+                "Encrypted Electron loader release host",
+            }
+        ]
+        self.assertEqual(repositories, {item["repository"] for item in wave_records})
+        self.assertEqual(9, len(wave_records))
+        self.assertTrue(all(item["status"] == "FAIL" for item in wave_records))
+        self.assertTrue(all(item["source_url"].startswith("https://github.com/") for item in wave_records))
+        self.assertEqual(
+            digests,
+            {
+                item["sha256"]
+                for item in indicators["indicators"]
+                if item.get("campaign") == "gerhodd.com GitHub Pages Electron delivery wave"
+                and item["status"] == "confirmed"
+            },
+        )
+
+        campaign = next(
+            item
+            for item in campaigns["campaigns"]
+            if item["id"] == "2026-11-gerhodd-pages-electron-loader"
+        )
+        self.assertEqual(
+            {f"https://github.com/{repository}" for repository in repositories},
+            set(campaign["confirmed_repository_urls"]),
+        )
+        self.assertEqual(digests, set(campaign["confirmed_sha256"]))
+
 
 if __name__ == "__main__":
     unittest.main()

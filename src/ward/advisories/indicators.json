@@ -111,6 +111,46 @@
       "source_url": "https://activation-gateway.cc/i/main.png",
       "campaign": "activation-gateway PNG process-hollowing wave",
       "validation_notes": "Ward independently reconstructed and hashed main_2.exe from the live PNG carrier inside Kali. The enclosing decoded C# performs process hollowing or writes and starts the PE from a random temporary directory. Ward's transient file scanner recorded the exact bytes under scan fc08a533-a06d-4b1d-83e3-803a07eec806; the PE was not executed and no final family name is asserted."
+    },
+    {
+      "sha256": "0d1d35921e9635a8aba86b6a60a65780b64f28ee48f0adc512bd79cd899aaa03",
+      "status": "confirmed",
+      "first_seen": "2026-10-31",
+      "source_url": "https://github.com/sg1331/reimagined-octo-spoon/releases/download/octo/latest_release.zip",
+      "campaign": "gerhodd.com GitHub Pages Electron delivery wave",
+      "validation_notes": "GitHub publishes this digest for the current 199,561,175-byte release asset. Ward independently downloaded and hash-verified the live archive only inside Kali on 2026-11-02. The archive tells victims to add the installer to Defender exclusions or disable real-time protection and was not executed."
+    },
+    {
+      "sha256": "87b2a24f27047b5528025296377f862876e6ed7e6f7e2c2fc212b8de3a724c9b",
+      "status": "confirmed",
+      "first_seen": "2026-10-31",
+      "source_url": "https://github.com/sg1331/reimagined-octo-spoon/releases/download/octo/latest_release.zip",
+      "campaign": "gerhodd.com GitHub Pages Electron delivery wave",
+      "validation_notes": "Ward independently hashed release-x64.exe from the current GitHub release. Bounded extraction identified an NSIS-wrapped Electron application whose main.js decrypts attacker-supplied JavaScript with a hard-coded AES-256-CBC key and executes the plaintext with new Function. The PE was not executed."
+    },
+    {
+      "sha256": "7c4ca1b7d3816ffd78f5e9f981353c407f0cab38ae9878b367caa0e746b0fde5",
+      "status": "confirmed",
+      "first_seen": "2026-10-31",
+      "source_url": "https://github.com/sg1331/reimagined-octo-spoon/releases/download/octo/latest_release.zip",
+      "campaign": "gerhodd.com GitHub Pages Electron delivery wave",
+      "validation_notes": "Ward independently extracted and hashed resources/app.asar from the current Electron bundle. A bounded ASAR parser recovered main.js and verified its SHA-256 against the archive header without loading Electron or JavaScript."
+    },
+    {
+      "sha256": "9395dcfbf5eee3573dda3ce3576908475c73dc0f2ecb7ef15a5ff85b4ef72d09",
+      "status": "confirmed",
+      "first_seen": "2026-10-31",
+      "source_url": "https://github.com/sg1331/reimagined-octo-spoon/releases/download/octo/latest_release.zip",
+      "campaign": "gerhodd.com GitHub Pages Electron delivery wave",
+      "validation_notes": "Ward independently extracted and hashed runtimec0cc.dat from the current Electron bundle. The recovered main.js reads this file, uses its first 16 bytes as an IV, decrypts the remainder with a hard-coded AES-256-CBC key, and passes the plaintext to new Function."
+    },
+    {
+      "sha256": "e325885dea1fb0c4d3bf567513e73f239a9b598915484073b13cb03b6b13a831",
+      "status": "confirmed",
+      "first_seen": "2026-10-31",
+      "source_url": "https://github.com/sg1331/reimagined-octo-spoon/releases/download/octo/latest_release.zip",
+      "campaign": "gerhodd.com GitHub Pages Electron delivery wave",
+      "validation_notes": "Derived SHA-256 of the 604,800-byte JavaScript plaintext recovered by Ward's bounded AES-CBC decoder from runtimec0cc.dat. Static control-flow identifiers and the application-ready path establish Defender exclusion, elevation, encrypted-payload execution, environment checking, installation, and self-destruction routines. The script was not executed and its final embedded payload remains unresolved."
     }
   ],
   "notes": [

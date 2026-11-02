@@ -444,6 +444,70 @@
         }
       ],
       "validation_notes": "Both repositories were live and independently pinned on 2026-11-02. Ward fetched the shared public stages only inside Kali and reproduced their base64, PNG tEXt, XOR, and C# decoding chain with bounded tools. The recovered source proves a process-hollowing execution mechanism, but Ward does not claim a final family name or account-operator identity without independent evidence."
+    },
+    {
+      "id": "2026-11-gerhodd-pages-electron-loader",
+      "title": "gerhodd.com GitHub Pages encrypted Electron loader wave",
+      "status": "confirmed-with-repository-artifacts",
+      "first_public_report": "2026-11-02",
+      "impersonated_projects": [
+        "Phasmophobia save utility",
+        "Cyber Doge cryptocurrency utility",
+        "Valheim mod menu",
+        "Zombies Retreat save utility",
+        "Hollow Knight viewer",
+        "WeMod Steam Deck companion",
+        "Evolve mod laboratory",
+        "Decky and Proton cheat manager",
+        "software release host"
+      ],
+      "reported_behavior": [
+        "repository-specific GitHub Pages lures",
+        "base64 and XOR-obfuscated HTML carriers",
+        "timed redirection to gerhodd.com",
+        "user-agent-dependent redirect cloaking",
+        "GitHub release-asset substitution",
+        "instructions to weaken Microsoft Defender",
+        "NSIS-wrapped Electron delivery",
+        "AES-256-CBC JavaScript decryption and new Function execution",
+        "static Defender-exclusion, elevation, installation, environment-checking, and self-destruction routines"
+      ],
+      "confirmed_repository_urls": [
+        "https://github.com/Mohit1899/Phasmo-Vault-Forge",
+        "https://github.com/allmonstar086-jpg/Cyber-Doge-Coin-Forge",
+        "https://github.com/zenamc/Valheim-Einherjar-Menu",
+        "https://github.com/Amogus2271/Zombies-Retreat-Save-Forge",
+        "https://github.com/prathviindusanalytics-netizen/Hollow-Viewer",
+        "https://github.com/linconlou/wemod-deck-companion",
+        "https://github.com/atheerhussein818-sketch/evolve-mod-lab",
+        "https://github.com/24se02ml062/Decky-Proton-Cheats-Manager-Companion",
+        "https://github.com/sg1331/reimagined-octo-spoon"
+      ],
+      "confirmed_sha256": [
+        "0d1d35921e9635a8aba86b6a60a65780b64f28ee48f0adc512bd79cd899aaa03",
+        "87b2a24f27047b5528025296377f862876e6ed7e6f7e2c2fc212b8de3a724c9b",
+        "7c4ca1b7d3816ffd78f5e9f981353c407f0cab38ae9878b367caa0e746b0fde5",
+        "9395dcfbf5eee3573dda3ce3576908475c73dc0f2ecb7ef15a5ff85b4ef72d09",
+        "e325885dea1fb0c4d3bf567513e73f239a9b598915484073b13cb03b6b13a831"
+      ],
+      "evidence": [
+        {
+          "url": "https://github.com/Mohit1899/Phasmo-Vault-Forge/blob/0581c4c1cf95c791fc728ccd91ee9a6d8afe62f0/README.md",
+          "type": "pinned-repository-readme",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://github.com/sg1331/reimagined-octo-spoon/releases/download/octo/latest_release.zip",
+          "type": "live-distribution-artifact",
+          "attribution": "Ward public evidence collection"
+        },
+        {
+          "url": "https://urlscan.io/result/01a18dfd-e643-74a9-8926-d95359132e63/",
+          "type": "public-historical-redirect-capture",
+          "attribution": "urlscan.io"
+        }
+      ],
+      "validation_notes": "All eight lure repositories and their GitHub Pages carriers were live and pinned on 2026-11-02. Ward decoded each carrier without executing its JavaScript and confirmed that every recovered page targeted gerhodd.com. Public October 29-30 urlscan captures establish redirects from randomized gerhodd.com result paths to the sg1331/reimagined-octo-spoon octo release. The current release asset was replaced on October 31, and Ward statically extracted its ZIP, NSIS, 7z, ASAR, and AES-CBC layers inside Kali without executing them. The current gerhodd.com root serves a decoy rather than the historical route. The evidence establishes a common delivery chain and confirmed malicious mechanisms, but it does not establish an operator identity, final malware-family name, or the unresolved locale.dat payload's complete behavior."
     }
   ]
 }
