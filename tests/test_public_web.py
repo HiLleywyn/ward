@@ -60,23 +60,24 @@ class PublicWebTests(unittest.TestCase):
             'limitations': ['No match does not prove safety.'],
         }
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'EMUWATCH_PUBLIC':'1','EMUWATCH_STATE_DIR':temp}):
-            with patch('emuwatch.web.scan_repository', return_value=result):
-                server = BoundedHTTPServer(('127.0.0.1',0), _handler())
-                thread = threading.Thread(target=server.serve_forever, daemon=True)
-                thread.start()
-                base = f'http://127.0.0.1:{server.server_port}'
-                try:
-                    request = Request(
-                        base + '/api/scan-repo',
-                        data=json.dumps({'target':'https://github.com/owner/repository'}).encode(),
-                        headers={'Content-Type':'application/json'},
-                    )
-                    with urlopen(request, timeout=3) as response:
-                        self.assertEqual(json.load(response)['id'], 'scan-fixture')
-                    with urlopen(base + '/api/scans', timeout=3) as response:
-                        scans = json.load(response)['scans']
-                    self.assertEqual([item['id'] for item in scans], ['scan-fixture'])
-                finally:
-                    server.shutdown()
-                    server.server_close()
-                    thread.join()
+            with patch('emuwatch.web.normalize_repository_url', return_value='https://github.com/owner/repository.git'):
+                with patch('emuwatch.web.scan_repository', return_value=result):
+                    server = BoundedHTTPServer(('127.0.0.1',0), _handler())
+                    thread = threading.Thread(target=server.serve_forever, daemon=True)
+                    thread.start()
+                    base = f'http://127.0.0.1:{server.server_port}'
+                    try:
+                        request = Request(
+                            base + '/api/scan-repo',
+                            data=json.dumps({'target':'https://github.com/owner/repository'}).encode(),
+                            headers={'Content-Type':'application/json'},
+                        )
+                        with urlopen(request, timeout=3) as response:
+                            self.assertEqual(json.load(response)['id'], 'scan-fixture')
+                        with urlopen(base + '/api/scans', timeout=3) as response:
+                            scans = json.load(response)['scans']
+                        self.assertEqual([item['id'] for item in scans], ['scan-fixture'])
+                    finally:
+                        server.shutdown()
+                        server.server_close()
+                        thread.join()
