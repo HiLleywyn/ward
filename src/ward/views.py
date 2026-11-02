@@ -5,6 +5,7 @@ import json
 from urllib.parse import quote, urlencode
 
 from .analysis import analysis_assessment
+from .data import load_malware_reports, malware_report
 
 
 def badge_state(job: dict | None) -> tuple[str, str, str]:
@@ -70,6 +71,20 @@ def _page(title: str, body: str) -> bytes:
 <footer>By Lleywyn · <a href="/api/v1">API</a> · <a href="https://github.com/HiLleywyn/ward">Source</a></footer><script src="/evidence.js"></script></body></html>""".encode()
 
 
+def _reviewed_section(reviewed: dict | None) -> str:
+    if reviewed is None:
+        return ""
+    payload = html.escape(json.dumps({
+        "record": reviewed, "template": malware_report(reviewed, load_malware_reports()),
+    }), quote=True)
+    query = html.escape(urlencode({"repository": reviewed["repository"]}), quote=True)
+    finding = html.escape(reviewed.get("finding", ""))
+    return f'''<section class="record-card"><h2>Reviewed Repository Evidence</h2>
+<div class="report-scroll" tabindex="0" role="region" aria-label="Reviewed technical report" data-reviewed-report="{payload}">
+<div class="evidence-copy" data-evidence>{finding}</div></div>
+<a href="/api/record?{query}">View reviewed evidence</a></section>'''
+
+
 def scan_record_page(job: dict, report: dict | None, reviewed: dict | None = None) -> bytes:
     result = job.get("result") or {}
     symbol, label, _ = badge_state(job)
@@ -123,6 +138,7 @@ def scan_record_page(job: dict, report: dict | None, reviewed: dict | None = Non
     body = f"""<section class="record-card"><dl class="record-facts">{rows}</dl>{evidence}</section>
 {previous_html}
 <section class="record-card"><h2>Findings</h2><ul class="record-findings">{finding_html}</ul></section>
+{_reviewed_section(reviewed)}
 <section class="record-card"><h2>Limits</h2><ul>{limitations or '<li>No additional limits recorded.</li>'}</ul></section>
 {analyses_html}
 <details class="record-card"><summary>Machine-Readable Report</summary><pre>{report_json}</pre></details>"""
@@ -154,10 +170,7 @@ def repository_ledger_page(history: dict, reviewed: dict | None = None) -> bytes
         f"<li><code>{html.escape(str(item['repository']))}</code><span>shared commit {html.escape(str(item['commit'])[:12])}</span></li>"
         for item in history.get("related_repositories", [])
     )
-    reviewed_html = ''
-    if reviewed is not None:
-        query = html.escape(urlencode({"repository": reviewed["repository"]}), quote=True)
-        reviewed_html = f'<section class="record-card"><h2>Reviewed repository evidence</h2><div class="evidence-copy" data-evidence>{html.escape(reviewed["finding"])}</div><a href="/api/record?{query}">View reviewed evidence</a></section>'
+    reviewed_html = _reviewed_section(reviewed)
     body = f"""<section class="record-card"><p>{html.escape(history['repository'])}</p><p>Earlier unknown results were not proven safe. This ledger reports only what each bounded scan observed.</p></section>
 {reviewed_html}
 <section class="record-card"><h2>Scans</h2><ul class="ledger-list">{''.join(rows) or '<li>No scans recorded.</li>'}</ul></section>

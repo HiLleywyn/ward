@@ -15,7 +15,7 @@ from .api import APIError, ScanCoordinator, normalize_sha256, openapi_document, 
 from .analysis import analysis_assessment
 from .analyze import assess_repository, parse_repository_target
 from .github import GitHubClient, GitHubError
-from .data import advisory_directory
+from .data import advisory_directory, load_malware_reports, malware_report
 from .evidence import default_store, malware_record, malware_records, repository_warning, snapshot_evidence
 from .scanner import ScanError, normalize_repository_url, scan_repository
 from .mcp import handle_message as handle_mcp_message
@@ -372,7 +372,10 @@ def _handler() -> type[BaseHTTPRequestHandler]:
                 return
             if request.path == "/api/reviewed":
                 review_data = json.loads((advisory_directory() / "review-status.json").read_text(encoding="utf-8"))
-                self._send_json({"records": malware_records(), "coverage": review_data["coverage"]})
+                reports = load_malware_reports()
+                records = [dict(item, report_key=item["malware"] if malware_report(item, reports) else None)
+                           for item in malware_records()]
+                self._send_json({"records": records, "reports": reports, "coverage": review_data["coverage"]})
                 return
             if request.path == "/api/record":
                 target = parse_qs(request.query).get("repository", [""])[0]

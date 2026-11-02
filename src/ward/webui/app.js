@@ -276,25 +276,18 @@ function threatRow(item) {
     icon('chevron-down', 'chevron'),
   );
   const body = document.createElement('div');
-  body.className = 'threat-body';
-  const location = document.createElement('div');
-  location.className = 'evidence-first';
-  const facts = textElement('dl', 'evidence-facts', '');
-  const files = textElement('dd', 'affected-files', '');
-  for (const path of item.malicious_path.split(' / ')) {
-    const code = textElement('code', 'affected-path', path);
-    if (path.length >= 32) code.tabIndex = 0;
-    files.append(code);
-  }
-  facts.append(textElement('dt', '', 'Revision'), evidenceText('dd', '', item.release), textElement('dt', '', 'Affected files'), files);
-  location.append(facts, textElement('h4', '', 'Finding'), evidenceParagraphs(item.finding));
+  body.className = 'threat-body report-scroll';
+  body.tabIndex = 0;
+  body.setAttribute('role', 'region');
+  body.setAttribute('aria-label', `${item.repository} technical report`);
   const actions = recordActions(`/repository?target=${encodeURIComponent(item.repository)}&latest=1`, `https://github.com/${item.repository}`);
-  body.append(location, actions);
+  body.append(recordReport(item, threatReports[item.report_key]), actions);
   row.append(summary, body);
   return row;
 }
 
 let threatRecords = [];
+let threatReports = {};
 const collapsedFamilies = new Set();
 const familyPages = new Map();
 
@@ -379,6 +372,7 @@ async function loadKnownThreats() {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || 'Threat records are unavailable.');
     threatRecords = payload.records;
+    threatReports = payload.reports || {};
     for (const [selector, values] of [
       ['#threat-family', [...new Set(threatRecords.map(item => item.malware))].sort()],
       ['#threat-type', [...new Set(threatRecords.map(recordType))].sort()],

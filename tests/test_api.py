@@ -312,6 +312,23 @@ class WardAPITests(unittest.TestCase):
                 urlopen(self.base + "/repository?latest=1", timeout=3)
             self.assertEqual(invalid.exception.code, 404)
 
+    def test_reviewed_reports_and_every_homepage_script_are_delivered(self):
+        import re
+        _, _, payload = self.request("/api/reviewed")
+        self.assertTrue(payload["reports"])
+        for record in payload["records"]:
+            if record["report_key"]:
+                self.assertIn(record["report_key"], payload["reports"])
+        with urlopen(self.base + "/", timeout=3) as response:
+            page = response.read().decode()
+        scripts = re.findall(r'<script[^>]+src="([^"]+)"', page)
+        self.assertTrue(scripts)
+        for script in scripts:
+            with self.subTest(script=script), urlopen(self.base + script, timeout=3) as response:
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.headers.get_content_type(), "text/javascript")
+                self.assertTrue(response.read())
+
 
 class ScanJobStoreTests(unittest.TestCase):
     def test_restart_marks_unfinished_job_incomplete_and_cancel_requires_capability(self):

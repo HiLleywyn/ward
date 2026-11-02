@@ -54,7 +54,7 @@ check('browser JavaScript parses', () => {
 function evidenceRenderers() {
   class Element {
     constructor(tagName) { this.tagName = tagName; this.children = []; }
-    set textContent(value) { this.children = [{textContent: String(value ?? '')}]; }
+    set textContent(value) { this.children = value ? [{textContent: String(value)}] : []; }
     get textContent() { return this.children.map(child => child.textContent).join(''); }
     set innerHTML(value) { throw new Error('Evidence must never be parsed as HTML'); }
     append(...children) { this.children.push(...children); }
@@ -64,7 +64,7 @@ function evidenceRenderers() {
   const start = script.indexOf('function familyGuidance(');
   const end = script.indexOf('function findingElement(');
   assert(start >= 0 && end > start, 'record rendering helpers are missing');
-  return vm.runInNewContext(`${read('src/ward/webui/evidence.js')}\n${script.slice(start, end)}\n({evidenceText, evidenceParagraphs, familyGuidance, externalScanLinks, recordActions})`, {
+  return vm.runInNewContext(`${read('src/ward/webui/evidence.js')}\n${script.slice(start, end)}\n({evidenceText, evidenceParagraphs, recordReport, familyGuidance, externalScanLinks, recordActions})`, {
     URL,
     document: {createElement: tag => new Element(tag), createTextNode: text => ({textContent: text}), querySelectorAll: () => []},
   });
@@ -80,10 +80,54 @@ check('evidence preserves text and safely formats technical values', () => {
   for (const token of [hash, 'Installer.rar', 'chacha20_xor', 'LOCALAPPDATA\\Microsoft\\Windows\\Update\\rt']) {
     assert(codes.some(child => child.textContent === token), `technical value is not code: ${token}`);
   }
-  assert(codes.find(child => child.textContent === hash).tabIndex === 0, 'long hashes must be keyboard accessible');
+  assert(codes.find(child => child.textContent === hash).tabIndex === undefined, 'hashes must not create individual scroll/focus controls');
   assert(result.children.every(child => !child.tagName || child.tagName === 'code'), 'untrusted text became markup');
   assert(evidenceText('p', '', 'Use `gpo_open` here.').textContent === 'Use gpo_open here.', 'explicit inline code is not supported');
   assert(evidenceText('p', '', 'Incomplete `markup').textContent === 'Incomplete `markup', 'incomplete markup lost text');
+});
+
+check('reviewed reports separate stages, exact hashes and evidence boundaries', () => {
+  const {recordReport} = evidenceRenderers();
+  const records = json('src/ward/advisories/malware-records.json').records;
+  const templates = json('src/ward/advisories/malware-reports.json').reports;
+  const descendants = element => [element, ...(element.children || []).flatMap(descendants)];
+  for (const record of records) {
+    const template = templates[record.malware];
+    if (!template) continue;
+    const report = recordReport(record, template);
+    const nodes = descendants(report);
+    assert(nodes.filter(item => item.tagName === 'h3').map(item => item.textContent).join('|') === 'Execution Chain|Technical Analysis|Artifact Hashes (SHA-256)|Assessment|Evidence Boundary', 'report sections missing');
+    assert(report.children.at(-1).children.map(item => item.textContent).join(' ') === record.scope, 'original evidence boundary lost');
+    for (const hash of template.hashes) {
+      assert(nodes.some(item => item.tagName === 'code' && item.textContent === hash.sha256), 'hash lost or fragmented');
+    }
+    assert(nodes.filter(item => item.className === 'report-stage-title').length === template.stages.length, 'technical stages lost');
+    assert(!report.textContent.includes('{artifact}') && !report.textContent.includes('{malicious_path}'), 'artifact substitution failed');
+  }
+  const record = records.find(item => item.repository === 'CarrierForge/Fishing-Planet-Cheat');
+  const report = recordReport(record, templates[record.malware]);
+  const nodes = descendants(report);
+  for (const value of ['encrypted/1.zip', '1/1.exe']) {
+    assert(nodes.some(item => item.tagName === 'code' && item.textContent === value), `execution-chain path split: ${value}`);
+  }
+  assert(report.textContent.includes('a48fd3fc0f587bc272b1ad5dc0ea72675fed5ff9'), 'wrong repository commit');
+});
+
+check('missing or mismatched reports retain safe original findings', () => {
+  const {recordReport} = evidenceRenderers();
+  const record = {release: 'main', malicious_path: 'payload.exe', finding: '<img onerror=alert(1)>', scope: 'Not executed.'};
+  for (const template of [undefined, {}, {chain: [], stages: [{}], hashes: []}, {
+    chain: ['wrong.exe'], stages: [{title: 'Wrong', artifact: 'wrong.exe', text: 'Unrelated finding.'}],
+    hashes: [{artifact: 'wrong.exe', sha256: 'a'.repeat(64)}],
+  }]) {
+    const report = recordReport(record, template);
+    assert(report.textContent.includes(record.finding), 'original finding lost');
+    assert(report.textContent.includes(record.scope), 'original scope lost');
+    assert(!report.textContent.includes('Unrelated finding.'), 'unmatched evidence was attached');
+  }
+  const css = read('src/ward/webui/styles.css');
+  assert(/\.report-scroll\s*\{[^}]*overflow-x:\s*auto/.test(css), 'record body must own horizontal scrolling');
+  assert(!/\.report-hashes code\s*\{[^}]*overflow-x:/.test(css), 'hashes must not have their own scroller');
 });
 
 check('complete paths and URLs stay in a single code span', () => {
