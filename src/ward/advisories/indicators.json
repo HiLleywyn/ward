@@ -63,6 +63,30 @@
       "source_url": "https://fucksociety.cc/encrypted/1.zip",
       "campaign": "git-software.cc PowerShell delivery wave",
       "validation_notes": "Ward independently hashed the 1/1.exe payload extracted only inside Kali from the live encrypted archive. The enclosing decoded loader explicitly starts this PE after screenshot exfiltration and Defender exclusion changes. The packed PE was statically inspected and not executed."
+    },
+    {
+      "sha256": "9a3d27209203ccd993516897167d864d7d1e4843b65885b9684311c214f88833",
+      "status": "confirmed",
+      "first_seen": "2026-10-31",
+      "source_url": "https://github.com/Separatedimanacle/Phantom-Blade-Zero-Cheat/releases/download/latest/launcher.zip",
+      "campaign": "Phantom Blade Zero libcurl sideload",
+      "validation_notes": "Ward independently downloaded and hashed the live password-protected GitHub release archive inside Kali on 2026-11-02. The archive was extracted with the password published in the pinned README and was not executed."
+    },
+    {
+      "sha256": "63484bfb8be34c3f7b4358dcd866b14fdafe9cbd671486fc9efcec346d059874",
+      "status": "confirmed",
+      "first_seen": "2026-10-31",
+      "source_url": "https://github.com/Separatedimanacle/Phantom-Blade-Zero-Cheat/releases/download/latest/launcher.zip",
+      "campaign": "Phantom Blade Zero libcurl sideload",
+      "validation_notes": "Ward independently hashed libcurl.dll from the live release. Static PE analysis confirmed curl proxy exports, CreateThread and VirtualAlloc imports, and an initialization path that reconstructs code from the custom .39ca68 section. The DLL was not executed."
+    },
+    {
+      "sha256": "b9ac528eac8fcb490180b1a378723a2e2436042c6b32078ccbab10670de17467",
+      "status": "confirmed",
+      "first_seen": "2026-10-31",
+      "source_url": "https://github.com/Separatedimanacle/Phantom-Blade-Zero-Cheat/releases/download/latest/launcher.zip",
+      "campaign": "Phantom Blade Zero libcurl sideload",
+      "validation_notes": "Derived SHA-256 of the 7,168-byte code blob reconstructed by Ward's bounded static decoder from libcurl.dll section .39ca68. This is a derived artifact for correlation, not a claim that the bytes were executed."
     }
   ],
   "notes": [

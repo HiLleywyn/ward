@@ -200,6 +200,42 @@ class RegistryTests(unittest.TestCase):
             any("a48fd3fc0f587bc272b1ad5dc0ea72675fed5ff9" in item for item in warning.limitations)
         )
 
+    def test_phantom_blade_sideload_is_bound_to_live_repository(self):
+        from ward.data import advisory_directory
+
+        directory = advisory_directory()
+        indicators = json.loads((directory / "indicators.json").read_text(encoding="utf-8"))
+        records = json.loads((directory / "malware-records.json").read_text(encoding="utf-8"))
+        campaigns = json.loads((directory / "campaigns.json").read_text(encoding="utf-8"))
+        digests = {
+            "9a3d27209203ccd993516897167d864d7d1e4843b65885b9684311c214f88833",
+            "63484bfb8be34c3f7b4358dcd866b14fdafe9cbd671486fc9efcec346d059874",
+            "b9ac528eac8fcb490180b1a378723a2e2436042c6b32078ccbab10670de17467",
+        }
+
+        record = next(item for item in records["records"] if item["id"] == "phantom-blade-zero-libcurl-sideload")
+        self.assertEqual(record["repository"], "Separatedimanacle/Phantom-Blade-Zero-Cheat")
+        self.assertEqual(record["status"], "FAIL")
+        self.assertIn("1614250757d476b5c962b6b81de831a2d587595c", record["release"])
+        self.assertEqual(
+            digests,
+            {
+                item["sha256"]
+                for item in indicators["indicators"]
+                if item.get("campaign") == "Phantom Blade Zero libcurl sideload"
+            },
+        )
+        campaign = next(
+            item
+            for item in campaigns["campaigns"]
+            if item["id"] == "2026-10-phantom-blade-libcurl-sideload"
+        )
+        self.assertEqual(digests, set(campaign["confirmed_sha256"]))
+        self.assertEqual(
+            ["https://github.com/Separatedimanacle/Phantom-Blade-Zero-Cheat"],
+            campaign["confirmed_repository_urls"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

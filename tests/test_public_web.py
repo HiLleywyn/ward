@@ -53,6 +53,7 @@ class PublicWebTests(unittest.TestCase):
                             'Truebrecycle/PAYDAY-3-Cheat',
                             'ConstablePucker/Honkai-Star-Rail-Cheat',
                             'hypergooseoverpass/Rust-External-Cheat',
+                            'Separatedimanacle/Phantom-Blade-Zero-Cheat',
                         },
                         {item['repository'] for item in reviewed['records']},
                     )
